@@ -1,5 +1,5 @@
 
-c.JupyterHub.spawner_class = 'sshspawner.SSHSpawner'
+c.JupyterHub.spawner_class = 'sshspawner.sshspawner.SSHSpawner'
 
 c.SSHSpawner.remote_host = 'cori19-224.nersc.gov'
 c.SSHSpawner.remote_port = '2222'
