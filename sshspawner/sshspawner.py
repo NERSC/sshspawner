@@ -1,6 +1,6 @@
 
 import os
-from subprocess import Popen, PIPE
+from subprocess import Popen, PIPE, TimeoutExpired
 
 
 from traitlets import Bool, Unicode
@@ -22,11 +22,15 @@ class SSHSpawner(Spawner):
                           ).tag(config=True)
 
     path = Unicode('/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin',
-                   help="""The default PATH (which should include the jupyter and python bin directories)"""
+                   help="""The default PATH (which should
+                   include the jupyter and python bin directories)
+                   """
                    ).tag(config=True)
 
     remote_port_command = Unicode("python -c \"import socket; sock = socket.socket(); sock.bind(('', 0)); print sock.getsockname()[1]; sock.close()\"",
-                                  help="""The default PATH which should include the jupyter and python bin directories"""
+                                  help="""The command to return an unused port
+                                  on the remote node
+                                  """
                                   ).tag(config=True)
 
     hub_api_url = Unicode('',
@@ -48,26 +52,42 @@ class SSHSpawner(Spawner):
                    """
                    ).tag(config=True)
 
+    gsi_cert_path = Unicode('/tmp/x509_%U',
+                            help="""The GSI certificate used to authenticate the hub with the
+                            remote host. (Assumes use_gsi=True)
+
+                            `~` will be expanded to the user's home directory
+                            `%U` will be expanded to the user's username
+                            """
+                            ).tag(config=True)
+
+    gsi_key_path = Unicode('/tmp/x509_%U',
+                           help="""The GSI key used to authenticate the hub with the
+                           remote host. (Assumes use_gsi=True)
+
+                           `~` will be expanded to the user's home directory
+                           `%U` will be expanded to the user's username
+                           """
+                           ).tag(config=True)
+
     pid = None
 
     def get_gsi_cert(self):
         """
-        Returns location of x509 user cert. Override this if you need to return a different name
+        Returns location of x509 user cert. Override this if you need to
+        return a different name
         """
-        return '/tmp/x509_' + self.user.name
+        return self.gsi_cert_path.replace("%U", self.user.name)
 
     def get_gsi_key(self):
         """
-        Returns location of x509 user cert. Override this if you need to return a different name
+        Returns location of x509 user cert. Override this if you need to
+        return a different name
         """
-        return '/tmp/x509_' + self.user.name
+        return self.gsi_key_path.replace("%U", self.user.name)
 
     def execute(self, command):
         ssh_env = os.environ.copy()
-
-        if self.use_gsi:
-            ssh_env['X509_USER_CERT'] = self.get_gsi_cert()
-            ssh_env['X509_USER_KEY'] = self.get_gsi_key()
 
         if self.ssh_command is None:
             self.ssh_command = 'ssh'
@@ -75,7 +95,10 @@ class SSHSpawner(Spawner):
         ssh_args = "-l {username} -p {port}".format(
             username=self.user.name, port=self.remote_port)
 
-        if self.ssh_keyfile:
+        if self.use_gsi:
+            ssh_env['X509_USER_CERT'] = self.get_gsi_cert()
+            ssh_env['X509_USER_KEY'] = self.get_gsi_key()
+        elif self.ssh_keyfile:
             ssh_args += " -i {keyfile}".format(keyfile=self.ssh_keyfile)
 
         command = "{ssh_command} {flags} {hostname} {command}".format(
@@ -87,7 +110,12 @@ class SSHSpawner(Spawner):
         proc = Popen(command, stdout=PIPE, stderr=PIPE,
                      shell=True, env=ssh_env)
 
-        stdout, stderr = proc.communicate(timeout=10)
+        try:
+            stdout, stderr = proc.communicate(timeout=10)
+        except TimeoutExpired:
+            proc.kill()
+            stdout, stderr = proc.communicate()
+
         returncode = proc.returncode
         return (stdout, stderr, returncode)
 
@@ -101,7 +129,7 @@ class SSHSpawner(Spawner):
             JPY_HUB_PREFIX=self.hub.server.base_url,
             # PATH=self.path
             # NERSC local mod
-            PATH="/global/common/cori/software/python/3.5-anaconda/bin:/global/common/cori/das/jupyterhub/:/usr/common/usg/bin:/usr/bin:/bin:/usr/bin/X11:/usr/games:/usr/lib/mit/bin:/usr/lib/mit/sbin"
+            PATH=self.path
         ))
 
         if self.notebook_dir:
@@ -120,7 +148,11 @@ class SSHSpawner(Spawner):
         for item in env.items():
             command = ('export %s="%s";' % item) + command
 
-        command = "'" + command + '< /dev/null >> jupyter.log 2>&1 & pid=$!; echo $pid' + "'"
+        # The command needs to be wrapped in quotes
+        # We pass in stdin to avoid the hang
+        # Grab the PID
+        command = "'%s < /dev/null >> jupyter.log 2>&1 & pid=$!; echo $pid'" % command
+
         stdout, stderr, retcode = self.execute(command)
         print("exec_notebook status=%d" % retcode)
         if stdout != b'':
@@ -133,8 +165,9 @@ class SSHSpawner(Spawner):
     def remote_random_port(self):
         # command = self.remote_port_command
         # NERSC local mod
-        command = "/global/common/cori/das/jupyterhub/get_port.py"
+        command = self.remote_port_command
 
+        command = command + "< /dev/null"
         stdout, stderr, retcode = self.execute(command)
 
         if stdout != b'':
@@ -146,8 +179,14 @@ class SSHSpawner(Spawner):
         return port
 
     def remote_signal(self, sig):
-        """simple implementation of signal, which we can use when we are using setuid (we are root)"""
+        """
+        simple implementation of signal, which we can use
+        when we are using setuid (we are root)
+        """
         command = 'kill -s %s %d' % (sig, self.pid)
+
+        command = command + "< /dev/null"
+
         stdout, stderr, retcode = self.execute(command)
         return (retcode == 0)
 
