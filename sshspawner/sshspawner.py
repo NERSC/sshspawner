@@ -116,6 +116,7 @@ class SSHSpawner(Spawner):
             hostname=self.remote_host,
             command=command)
 
+        self.log.debug("command: %s" % command)
         proc = Popen(command, stdout=PIPE, stderr=PIPE,
                      shell=True, env=ssh_env)
 
@@ -163,7 +164,7 @@ class SSHSpawner(Spawner):
         command = "'%s < /dev/null >> jupyter.log 2>&1 & pid=$!; echo $pid'" % command
 
         stdout, stderr, retcode = self.execute(command)
-        print("exec_notebook status=%d" % retcode)
+        self.log.debug("exec_notebook status=%d" % retcode)
         if stdout != b'':
             pid = int(stdout)
         else:
@@ -182,9 +183,9 @@ class SSHSpawner(Spawner):
         if stdout != b'':
             port = int(stdout)
         else:
-            print("Bad port")
+            self.log.error("could not get a remote port")
             return None
-        print("port=%d" % (port))
+        self.log.debug("port=%d" % (port))
         return port
 
     def remote_signal(self, sig):
