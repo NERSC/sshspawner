@@ -72,28 +72,37 @@ class SSHSpawner(Spawner):
 
     pid = None
 
+    def get_remote_user(self, username):
+        """
+        Maps a jupyterhub username to a remote user. Override this if
+        you need to return a different name
+        """
+        return username
+
     def get_gsi_cert(self):
         """
         Returns location of x509 user cert. Override this if you need to
-        return a different name
+        return a different path
         """
         return self.gsi_cert_path.replace("%U", self.user.name)
 
     def get_gsi_key(self):
         """
-        Returns location of x509 user cert. Override this if you need to
-        return a different name
+        Returns location of x509 user key. Override this if you need to
+        return a different path
         """
         return self.gsi_key_path.replace("%U", self.user.name)
 
     def execute(self, command):
         ssh_env = os.environ.copy()
 
+        username = self.get_remote_user(self.user.name)
+
         if self.ssh_command is None:
             self.ssh_command = 'ssh'
 
-        ssh_args = "-l {username} -p {port}".format(
-            username=self.user.name, port=self.remote_port)
+        ssh_args = "-o StrictHostKeyChecking=no -l {username} -p {port}".format(
+            username=username, port=self.remote_port)
 
         if self.use_gsi:
             ssh_env['X509_USER_CERT'] = self.get_gsi_cert()
