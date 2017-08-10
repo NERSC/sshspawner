@@ -116,7 +116,7 @@ class SSHSpawner(Spawner):
             hostname=self.remote_host,
             command=command)
 
-        self.log.debug("command: %s" % command)
+        self.log.debug("command: {}".format(command))
         proc = Popen(command, stdout=PIPE, stderr=PIPE,
                      shell=True, env=ssh_env)
 
@@ -164,7 +164,7 @@ class SSHSpawner(Spawner):
         command = "'%s < /dev/null >> jupyter.log 2>&1 & pid=$!; echo $pid'" % command
 
         stdout, stderr, retcode = self.execute(command)
-        self.log.debug("exec_notebook status=%d" % retcode)
+        self.log.debug("exec_notebook status={}".format(retcode))
         if stdout != b'':
             pid = int(stdout)
         else:
@@ -185,7 +185,7 @@ class SSHSpawner(Spawner):
         else:
             self.log.error("could not get a remote port")
             return None
-        self.log.debug("port=%d" % (port))
+        self.log.debug("port={}".format(port))
         return port
 
     def remote_signal(self, sig):
@@ -203,6 +203,8 @@ class SSHSpawner(Spawner):
     @gen.coroutine
     def start(self):
         """Start the process"""
+        self.log.debug("Entering start")
+
         self.user.server.ip = self.remote_host
         port = self.remote_random_port()
         if port is not None and port > 0:
@@ -227,11 +229,16 @@ class SSHSpawner(Spawner):
         # import pdb; pdb.set_trace()
 
         self.pid = self.exec_notebook(remote_cmd)
+
+        self.log.debug("Starting User: {}, PID: {}".format(self.user.name, self.pid))
+
         if self.pid < 0:
             return None
 
     @gen.coroutine
     def poll(self):
+        self.log.debug("Entering poll")
+
         if not self.pid:
                 # no pid, not running
             self.clear_state()
@@ -239,6 +246,9 @@ class SSHSpawner(Spawner):
 
         # send signal 0 to check if PID exists
         alive = self.remote_signal(0)
+        self.log.debug("Polling returned {}".format(alive))
+
+
         if not alive:
             self.clear_state()
             return 0
@@ -247,6 +257,7 @@ class SSHSpawner(Spawner):
 
     @gen.coroutine
     def stop(self):
+        self.log.debug("Entering stop")
 
         alive = self.remote_signal(15)
 
@@ -254,6 +265,8 @@ class SSHSpawner(Spawner):
 
     def get_state(self):
         """get the current state"""
+        self.log.debug("Entering get_state")
+
         state = super().get_state()
         if self.pid:
             state['pid'] = self.pid
@@ -261,11 +274,15 @@ class SSHSpawner(Spawner):
 
     def load_state(self, state):
         """load state from the database"""
+        self.log.debug("Entering load_state")
+
         super().load_state(state)
         if 'pid' in state:
             self.pid = state['pid']
 
     def clear_state(self):
         """clear any state (called after shutdown)"""
+        self.log.debug("Entering clear_state")
+        self.log.debug("Clearing User: {}, PID: {}".format(self.user.name, self.pid))
         super().clear_state()
         self.pid = 0
