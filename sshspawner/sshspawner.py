@@ -208,7 +208,7 @@ class SSHSpawner(Spawner):
         self.log.debug("Entering start")
 
         port = self.remote_random_port()
-	if port is None or port==0:
+        if port is None or port==0:
             return False
         cmd = []
 
