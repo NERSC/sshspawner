@@ -27,9 +27,11 @@ class SSHSpawner(Spawner):
                    """
                    ).tag(config=True)
 
-    remote_port_command = Unicode("python -c \"import socket; sock = socket.socket(); sock.bind(('', 0)); print sock.getsockname()[1]; sock.close()\"",
+    remote_port_command = Unicode("/usr/local/bin/get_port.py",
                                   help="""The command to return an unused port
-                                  on the remote node
+                                  on the remote node. 
+                                  Copy from scripts/get_port.py to 
+                                  /usr/local/bin/ on the remote node 
                                   """
                                   ).tag(config=True)
 
@@ -110,7 +112,9 @@ class SSHSpawner(Spawner):
         elif self.ssh_keyfile:
             ssh_args += " -i {keyfile}".format(keyfile=self.ssh_keyfile)
 
-        command = "{ssh_command} {flags} {hostname} {command}".format(
+        # This is not very good at handling nested quotes - avoid using quotes in 
+        # the command and use wrapper scripts as much as possible 
+        command = "{ssh_command} {flags} {hostname} bash -c '{command}'".format(
             ssh_command=self.ssh_command,
             flags=ssh_args,
             hostname=self.remote_host,
@@ -156,12 +160,16 @@ class SSHSpawner(Spawner):
     def exec_notebook(self, command):
         env = self.user_env()
         for item in env.items():
-            command = ('export %s="%s";' % item) + command
+            # item is a (key, value) tuple
+            command = ('export %s=%s;' % item) + command
 
-        # The command needs to be wrapped in quotes
-        # We pass in stdin to avoid the hang
-        # Grab the PID
-        command = "'%s < /dev/null >> jupyter.log 2>&1 & pid=$!; echo $pid'" % command
+
+        # pass this into bash -c 'command'
+        # command needs to be in "" quotes, with all the redirection outside
+        # eg. bash -c '"ls -la" < /dev/null >> out.txt'
+        # We pass in /dev/null to stdin to avoid the hang
+        # Finally Grab the PID
+        command = '"%s" < /dev/null >> jupyter.log 2>&1 & pid=$!; echo $pid' % command
 
         stdout, stderr, retcode = self.execute(command)
         self.log.debug("exec_notebook status={}".format(retcode))
@@ -177,7 +185,11 @@ class SSHSpawner(Spawner):
         # NERSC local mod
         command = self.remote_port_command
 
-        command = command + "< /dev/null"
+        # pass this into bash -c 'command'
+        # command needs to be in "" quotes, with all the redirection outside
+        # eg. bash -c '"ls -la" < /dev/null >> out.txt'
+        command = '"%s" < /dev/null' % command
+
         stdout, stderr, retcode = self.execute(command)
 
         if stdout != b'':
@@ -195,7 +207,10 @@ class SSHSpawner(Spawner):
         """
         command = 'kill -s %s %d' % (sig, self.pid)
 
-        command = command + "< /dev/null"
+        # pass this into bash -c 'command'
+        # command needs to be in "" quotes, with all the redirection outside
+        # eg. bash -c '"ls -la" < /dev/null >> out.txt'
+        command = '"%s" < /dev/null' % command
 
         stdout, stderr, retcode = self.execute(command)
         return (retcode == 0)
