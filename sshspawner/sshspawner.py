@@ -137,6 +137,7 @@ class SSHSpawner(Spawner):
             JPY_COOKIE_NAME=self.user.server.cookie_name,
             JPY_BASE_URL=self.user.server.base_url,
             JPY_HUB_PREFIX=self.hub.server.base_url,
+            JUPYTERHUB_PREFIX=self.hub.server.base_url,
             # PATH=self.path
             # NERSC local mod
             PATH=self.path
@@ -150,6 +151,7 @@ class SSHSpawner(Spawner):
             hub_api_url = self.hub_api_url
 
         env['JPY_HUB_API_URL'] = hub_api_url
+        env['JUPYTERHUB_API_URL'] = hub_api_url
 
         return env
 
@@ -205,11 +207,8 @@ class SSHSpawner(Spawner):
         """Start the process"""
         self.log.debug("Entering start")
 
-        self.user.server.ip = self.remote_host
         port = self.remote_random_port()
-        if port is not None and port > 0:
-            self.user.server.port = port
-        else:
+        if port is None or port==0:
             return False
         cmd = []
 
@@ -222,6 +221,9 @@ class SSHSpawner(Spawner):
             for index, value in enumerate(cmd):
                 if value == old:
                     cmd[index] = new
+        for index, value in enumerate(cmd):
+            if value[0:6] == '--port':
+                cmd[index] = '--port=%d' % (port)
 
         remote_cmd = ' '.join(cmd)
 
@@ -234,6 +236,7 @@ class SSHSpawner(Spawner):
 
         if self.pid < 0:
             return None
+        return (self.remote_host, port)
 
     @gen.coroutine
     def poll(self):
