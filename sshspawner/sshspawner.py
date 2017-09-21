@@ -182,11 +182,11 @@ class SSHSpawner(Spawner):
         # Finally Grab the PID
         # command = '"%s" < /dev/null >> jupyter.log 2>&1 & pid=$!; echo $pid' % command
 
-        bash_script_str += '%s < /dev/null >> jupyter.log 2>&1 & pid=$!' % command
-        bash_script_str += 'echo $pid'
+        bash_script_str += '%s < /dev/null >> jupyter.log 2>&1 & pid=$!\n' % command
+        bash_script_str += 'echo $pid\n'
 
         run_script = "/tmp/{}_run.sh".format(self.user.name)
-        with open(run_script) as f:
+        with open(run_script, "w") as f:
             f.write(bash_script_str)
 
         stdout, stderr, retcode = self.execute(command, stdin=run_script)
