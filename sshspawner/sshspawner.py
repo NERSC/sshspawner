@@ -96,6 +96,13 @@ class SSHSpawner(Spawner):
         return self.gsi_key_path.replace("%U", self.user.name)
 
     def execute(self, command=None, stdin=None):
+        """
+        command: command to execute  (via bash -c command)
+        stdin: script to pass in via stdin (via 'bash -s' < stdin)
+
+        executes command on remote system "command" and "stdin" are mutually exclusive
+
+        """
         ssh_env = os.environ.copy()
 
         username = self.get_remote_user(self.user.name)
@@ -168,7 +175,7 @@ class SSHSpawner(Spawner):
 
     def exec_notebook(self, command):
         env = self.user_env()
-        bash_script_str = "#!/bin/bash"
+        bash_script_str = "#!/bin/bash\n"
 
         for item in env.items():
             # item is a (key, value) tuple
