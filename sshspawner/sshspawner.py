@@ -245,8 +245,8 @@ class SSHSpawner(Spawner):
         """Start the process"""
         self.log.debug("Entering start")
 
-        port = self.remote_random_port()
-        if port is None or port == 0:
+        self.port = self.remote_random_port()
+        if self.port is None or self.port == 0:
             return False
         cmd = []
 
@@ -261,7 +261,7 @@ class SSHSpawner(Spawner):
                     cmd[index] = new
         for index, value in enumerate(cmd):
             if value[0:6] == '--port':
-                cmd[index] = '--port=%d' % (port)
+                cmd[index] = '--port=%d' % (self.port)
 
         remote_cmd = ' '.join(cmd)
 
@@ -274,7 +274,7 @@ class SSHSpawner(Spawner):
 
         if self.pid < 0:
             return None
-        return (self.remote_host, port)
+        return (self.remote_host, self.port)
 
     @gen.coroutine
     def poll(self):
