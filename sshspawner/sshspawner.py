@@ -238,6 +238,7 @@ class SSHSpawner(Spawner):
         command = '"%s" < /dev/null' % command
 
         stdout, stderr, retcode = self.execute(command)
+        self.log.debug("command: {} returned {}".format(command, retcode))
         return (retcode == 0)
 
     @gen.coroutine
