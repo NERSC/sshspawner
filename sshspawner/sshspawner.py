@@ -141,6 +141,7 @@ class SSHSpawner(Spawner):
         try:
             stdout, stderr = proc.communicate(timeout=10)
         except TimeoutExpired:
+            self.log.debug("execute timed out!")
             proc.kill()
             stdout, stderr = proc.communicate()
 
