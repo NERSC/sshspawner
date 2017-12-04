@@ -1,10 +1,11 @@
 
 import os
-from subprocess import Popen, PIPE, TimeoutExpired
+#from subprocess import Popen, PIPE, TimeoutExpired
 
 
 from traitlets import Bool, Unicode
-from tornado import gen
+from tornado import gen, Task, Return
+from tornado.process import Subprocess
 
 
 from jupyterhub.spawner import Spawner
@@ -95,6 +96,7 @@ class SSHSpawner(Spawner):
         """
         return self.gsi_key_path.replace("%U", self.user.name)
 
+    @gen.coroutine
     def execute(self, command=None, stdin=None):
         """
         command: command to execute  (via bash -c command)
@@ -135,18 +137,16 @@ class SSHSpawner(Spawner):
                 command=command)
 
         self.log.debug("command: {}".format(command))
-        proc = Popen(command, stdout=PIPE, stderr=PIPE,
-                     shell=True, env=ssh_env)
+        proc = Subprocess(cmd, shell=True, env=ssh_env, 
+                stdout=Subprocess.STREAM, stderr=Subprocess.STREAM)
+        retcode, result, error = yield [
+                proc.wait_for_exit(raise_error=False),
+                Task(proc.stdout.read_until_close),
+                Task(proc.stderr.read_until_close),
+        ]
 
-        try:
-            stdout, stderr = proc.communicate(timeout=10)
-        except TimeoutExpired:
-            self.log.debug("execute timed out!")
-            proc.kill()
-            stdout, stderr = proc.communicate()
+        raise Return((retcode, result.strip(), error.strip()))
 
-        returncode = proc.returncode
-        return (stdout, stderr, returncode)
 
     def user_env(self):
 
@@ -174,6 +174,7 @@ class SSHSpawner(Spawner):
 
         return env
 
+    @gen.coroutine
     def exec_notebook(self, command):
         env = self.user_env()
         bash_script_str = "#!/bin/bash\n"
@@ -197,7 +198,7 @@ class SSHSpawner(Spawner):
         with open(run_script, "w") as f:
             f.write(bash_script_str)
 
-        stdout, stderr, retcode = self.execute(command, stdin=run_script)
+        stdout, stderr, retcode = yield self.execute(command, stdin=run_script)
         self.log.debug("exec_notebook status={}".format(retcode))
         if stdout != b'':
             pid = int(stdout)
@@ -206,6 +207,7 @@ class SSHSpawner(Spawner):
 
         return pid
 
+    @gen.coroutine
     def remote_random_port(self):
         # command = self.remote_port_command
         # NERSC local mod
@@ -216,7 +218,7 @@ class SSHSpawner(Spawner):
         # eg. bash -c '"ls -la" < /dev/null >> out.txt'
         command = '"%s" < /dev/null' % command
 
-        stdout, stderr, retcode = self.execute(command)
+        stdout, stderr, retcode = yield self.execute(command)
 
         if stdout != b'':
             port = int(stdout)
@@ -226,6 +228,7 @@ class SSHSpawner(Spawner):
         self.log.debug("port={}".format(port))
         return port
 
+    @gen.coroutine
     def remote_signal(self, sig):
         """
         simple implementation of signal, which we can use
@@ -238,7 +241,7 @@ class SSHSpawner(Spawner):
         # eg. bash -c '"ls -la" < /dev/null >> out.txt'
         command = '"%s" < /dev/null' % command
 
-        stdout, stderr, retcode = self.execute(command)
+        stdout, stderr, retcode = yield self.execute(command)
         self.log.debug("command: {} returned {} --- {} --- {}".format(command, stdout, stderr, retcode))
         return (retcode == 0)
 
@@ -247,7 +250,7 @@ class SSHSpawner(Spawner):
         """Start the process"""
         self.log.debug("Entering start")
 
-        port = self.remote_random_port()
+        port = yield self.remote_random_port()
         if port is None or port == 0:
             return False
         cmd = []
@@ -270,7 +273,7 @@ class SSHSpawner(Spawner):
         # time.sleep(2)
         # import pdb; pdb.set_trace()
 
-        self.pid = self.exec_notebook(remote_cmd)
+        self.pid = yield self.exec_notebook(remote_cmd)
 
         self.log.debug("Starting User: {}, PID: {}".format(self.user.name, self.pid))
 
@@ -288,7 +291,7 @@ class SSHSpawner(Spawner):
             return 0
 
         # send signal 0 to check if PID exists
-        alive = self.remote_signal(0)
+        alive = yield self.remote_signal(0)
         self.log.debug("Polling returned {}".format(alive))
 
         if not alive:
@@ -301,7 +304,7 @@ class SSHSpawner(Spawner):
     def stop(self):
         self.log.debug("Entering stop")
 
-        alive = self.remote_signal(15)
+        alive = yield self.remote_signal(15)
 
         self.clear_state()
 
