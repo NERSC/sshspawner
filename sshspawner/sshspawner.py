@@ -44,7 +44,10 @@ class SSHSpawner(Spawner):
 
     ssh_keyfile = Unicode('~/.ssh/id_rsa',
                           help="""The keyfile used to authenticate the hub with the remote host.
-                          Assumes use_gsi=False."""
+                          Assumes use_gsi=False.
+
+                          `~` will be expanded to the user's home directory
+                          `%U` will be expanded to the user's username"""
                           ).tag(config=True)
 
     use_gsi = Bool(False,
@@ -117,7 +120,8 @@ class SSHSpawner(Spawner):
             ssh_env['X509_USER_CERT'] = self.get_gsi_cert()
             ssh_env['X509_USER_KEY'] = self.get_gsi_key()
         elif self.ssh_keyfile:
-            ssh_args += " -i {keyfile}".format(keyfile=self.ssh_keyfile)
+            ssh_args += " -i {keyfile}".format(
+                    keyfile=self.ssh_keyfile.replace("%U", self.user.name))
 
         # This is not very good at handling nested quotes - avoid using quotes in
         # the command and use wrapper scripts as much as possible
