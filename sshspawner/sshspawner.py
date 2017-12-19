@@ -305,7 +305,7 @@ class SSHSpawner(Spawner):
             return None
 
     @gen.coroutine
-    def stop(self):
+    def stop(self, now=False):
         self.log.debug("Entering stop")
 
         alive = self.remote_signal(15)
