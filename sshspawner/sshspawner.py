@@ -122,6 +122,7 @@ class SSHSpawner(Spawner):
         elif self.ssh_keyfile:
             ssh_args += " -i {keyfile}".format(
                     keyfile=self.ssh_keyfile.replace("%U", self.user.name))
+            ssh_args += " -o preferredauthentications=publickey"
 
         # This is not very good at handling nested quotes - avoid using quotes in
         # the command and use wrapper scripts as much as possible
