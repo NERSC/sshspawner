@@ -98,6 +98,10 @@ class SSHSpawner(Spawner):
         """
         return self.gsi_key_path.replace("%U", self.user.name)
 
+    # This method seems similar in many ways to the run_command function from BatchSpawner.
+    # Mike Milligan decided that that function should be a coroutine.
+    # So perhaps this similar method should also be a coroutine.
+    @gen.coroutine
     def execute(self, command=None, stdin=None):
         """
         command: command to execute  (via bash -c command)
@@ -144,12 +148,24 @@ class SSHSpawner(Spawner):
                      shell=True, env=ssh_env)
 
         try:
-            stdout, stderr = proc.communicate(timeout=10)
+            # Here is a call of a method with indefinite run time. 
+            # In particular, it follows a try statement.
+            # This is similar to when yield statements are used in run_command.
+            # So perhaps a yield statement is necessary here to prevent blocking.
+            # On the other hand, perhaps the timeout is sufficient to prevent blocking.
+            # In that case this method probably wouldn't need to be a coroutine.
+            stdout, stderr = yield proc.communicate(timeout=10)
         except TimeoutExpired:
             self.log.debug("execute timed out")
             proc.kill()
             self.log.debug("execute timed out done kill")
-            stdout, stderr = proc.communicate()
+            # Not as confident about the yield statement here.
+            # Why is the communicate method called again after it already timed out?
+            # Is there a reason to expect that the communicate method will run more quickly this time,
+            # making the timeout=10 parameter assignment from above, as well as the yield statement, unnecessary?
+            # On the other hand, if there isn't, then because there is no timeout=10,
+            # It would seem that the yield statement might be even more necessary here than above.
+            stdout, stderr = yield proc.communicate()
             self.log.debug("execute timed out done communicate")
 
         returncode = proc.returncode
@@ -181,6 +197,8 @@ class SSHSpawner(Spawner):
 
         return env
 
+    # In general, it seems that any method calling a coroutine should itself be a coroutine.
+    @gen.coroutine
     def exec_notebook(self, command):
         env = self.user_env()
         bash_script_str = "#!/bin/bash\n"
@@ -204,7 +222,8 @@ class SSHSpawner(Spawner):
         with open(run_script, "w") as f:
             f.write(bash_script_str)
 
-        stdout, stderr, retcode = self.execute(command, stdin=run_script)
+        # In general, it seems that yield statements should precede any call of a coroutine.
+        stdout, stderr, retcode = yield self.execute(command, stdin=run_script)
         self.log.debug("exec_notebook status={}".format(retcode))
         if stdout != b'':
             pid = int(stdout)
@@ -213,6 +232,8 @@ class SSHSpawner(Spawner):
 
         return pid
 
+    # In general, it seems that any method calling a coroutine should itself be a coroutine.
+    @gen.coroutine
     def remote_random_port(self):
         # command = self.remote_port_command
         # NERSC local mod
@@ -223,6 +244,7 @@ class SSHSpawner(Spawner):
         # eg. bash -c '"ls -la" < /dev/null >> out.txt'
         command = '"%s" < /dev/null' % command
 
+        #  In general, it seems that yield statements should precede any call of a coroutine.
         stdout, stderr, retcode = self.execute(command)
 
         if stdout != b'':
@@ -233,6 +255,8 @@ class SSHSpawner(Spawner):
         self.log.debug("port={}".format(port))
         return port
 
+     # In general, it seems that any method calling a coroutine should itself be a coroutine.
+    @gen.coroutine
     def remote_signal(self, sig):
         """
         simple implementation of signal, which we can use
@@ -245,7 +269,8 @@ class SSHSpawner(Spawner):
         # eg. bash -c '"ls -la" < /dev/null >> out.txt'
         command = '"%s" < /dev/null' % command
 
-        stdout, stderr, retcode = self.execute(command)
+        #  In general, it seems that yield statements should precede any call of a coroutine.
+        stdout, stderr, retcode = yield self.execute(command)
         self.log.debug("command: {} returned {} --- {} --- {}".format(command, stdout, stderr, retcode))
         return (retcode == 0)
 
