@@ -98,76 +98,76 @@ class SSHSpawner(Spawner):
         """
         return self.gsi_key_path.replace("%U", self.user.name)
 
-async def execute(self, command=None, stdin=None):
-    """
-    command: command to execute  (via bash -c command)
-    stdin: script to pass in via stdin (via 'bash -s' < stdin)
-    executes command on remote system "command" and "stdin" are mutually exclusive
-    """
+    async def execute(self, command=None, stdin=None):
+        """
+        command: command to execute  (via bash -c command)
+        stdin: script to pass in via stdin (via 'bash -s' < stdin)
+        executes command on remote system "command" and "stdin" are mutually exclusive
+        """
 
-    # Have to change the environment manually before running the process.
-    # asyncio.subprocess.Process does not have an `env` attribute, the way subprocess.Popen does.
-    backup_env = os.environ.copy()
-    # Want a copy by value, not reference
-    ssh_env = backup_env.copy()
-    
-    username = self.get_remote_user(self.user.name)
+        # Have to change the environment manually before running the process.
+        # asyncio.subprocess.Process does not have an `env` attribute, the way subprocess.Popen does.
+        backup_env = os.environ.copy()
+        # Want a copy by value, not reference
+        ssh_env = backup_env.copy()
 
-    if self.ssh_command is None:
-        self.ssh_command = 'ssh'
+        username = self.get_remote_user(self.user.name)
 
-    ssh_args = "-o StrictHostKeyChecking=no -l {username} -p {port}".format(
-        username=username, port=self.remote_port)
-    
-    if self.use_gsi:
-        ssh_env['X509_USER_CERT'] = self.get_gsi_cert()
-        ssh_env['X509_USER_KEY']  = self.get_gsi_key()
-    elif self.ssh_keyfile:
-        ssh_args += " -i {keyfile}".format(
-                keyfile=self.ssh_keyfile.replace("%U", self.user.name))
-        ssh_args += " -o preferredauthentications=publickey"
-    
-    os.environ.update(ssh_env)
-    
-    # This is not very good at handling nested quotes - avoid using quotes in
-    # the command and use wrapper scripts as much as possible
-    if stdin:
-        command = "{ssh_command} {flags} {hostname} 'bash -s' < {stdin}".format(
-            ssh_command=self.ssh_command,
-            flags=ssh_args,
-            hostname=self.remote_host,
-            stdin=stdin)
-    else:
-        command = "{ssh_command} {flags} {hostname} bash -c '{command}'".format(
-            ssh_command=self.ssh_command,
-            flags=ssh_args,
-            hostname=self.remote_host,
-            command=command)
+        if self.ssh_command is None:
+            self.ssh_command = 'ssh'
 
-    self.log.debug("command: {}".format(command))
-    
-    try:
-        proc = await asyncio.create_subprocess_shell(command, 
-                                                    stdout=asyncio.subprocess.PIPE, 
-                                                    stderr=asyncio.subprocess.PIPE)
+        ssh_args = "-o StrictHostKeyChecking=no -l {username} -p {port}".format(
+            username=username, port=self.remote_port)
+
+        if self.use_gsi:
+            ssh_env['X509_USER_CERT'] = self.get_gsi_cert()
+            ssh_env['X509_USER_KEY']  = self.get_gsi_key()
+        elif self.ssh_keyfile:
+            ssh_args += " -i {keyfile}".format(
+                    keyfile=self.ssh_keyfile.replace("%U", self.user.name))
+            ssh_args += " -o preferredauthentications=publickey"
+
+        os.environ.update(ssh_env)
+
+        # This is not very good at handling nested quotes - avoid using quotes in
+        # the command and use wrapper scripts as much as possible
+        if stdin:
+            command = "{ssh_command} {flags} {hostname} 'bash -s' < {stdin}".format(
+                ssh_command=self.ssh_command,
+                flags=ssh_args,
+                hostname=self.remote_host,
+                stdin=stdin)
+        else:
+            command = "{ssh_command} {flags} {hostname} bash -c '{command}'".format(
+                ssh_command=self.ssh_command,
+                flags=ssh_args,
+                hostname=self.remote_host,
+                command=command)
+
+        self.log.debug("command: {}".format(command))
+
         try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
-        except asyncio.TimeoutError:
-            self.log.debug("execute timed out")
-            proc.kill()
-            self.log.debug("execute timed out done kill")
-            stdout, stderr = await proc.communicate()
-            self.log.debug("execute timed out done communicate")
+            proc = await asyncio.create_subprocess_shell(command, 
+                                                        stdout=asyncio.subprocess.PIPE, 
+                                                        stderr=asyncio.subprocess.PIPE)
+            try:
+                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
+            except asyncio.TimeoutError:
+                self.log.debug("execute timed out")
+                proc.kill()
+                self.log.debug("execute timed out done kill")
+                stdout, stderr = await proc.communicate()
+                self.log.debug("execute timed out done communicate")
 
-        returncode = proc.returncode
-    
-    # Even if the above fails, we still want our environment variables reset and cleared of sensitive information.
-    finally:
-        os.environ.clear()
-        os.environ.update(backup_env)
-    
-    return (stdout, stderr, returncode)
+            returncode = proc.returncode
 
+        # Even if the above fails, we still want our environment variables reset and cleared of sensitive information.
+        finally:
+            os.environ.clear()
+            os.environ.update(backup_env)
+
+        return (stdout, stderr, returncode)
+    
     def user_env(self):
 
         env = super(SSHSpawner, self).get_env()
@@ -194,7 +194,7 @@ async def execute(self, command=None, stdin=None):
 
         return env
 
-async def exec_notebook(self, command):
+    async def exec_notebook(self, command):
         env = self.user_env()
         bash_script_str = "#!/bin/bash\n"
 
@@ -226,7 +226,7 @@ async def exec_notebook(self, command):
 
         return pid
 
-    def remote_random_port(self):
+    async def remote_random_port(self):
         # command = self.remote_port_command
         # NERSC local mod
         command = self.remote_port_command
@@ -236,7 +236,7 @@ async def exec_notebook(self, command):
         # eg. bash -c '"ls -la" < /dev/null >> out.txt'
         command = '"%s" < /dev/null' % command
 
-        stdout, stderr, retcode = self.execute(command)
+        stdout, stderr, retcode = await self.execute(command)
 
         if stdout != b'':
             port = int(stdout)
@@ -246,7 +246,7 @@ async def exec_notebook(self, command):
         self.log.debug("port={}".format(port))
         return port
 
-    def remote_signal(self, sig):
+    async def remote_signal(self, sig):
         """
         simple implementation of signal, which we can use
         when we are using setuid (we are root)
@@ -258,7 +258,7 @@ async def exec_notebook(self, command):
         # eg. bash -c '"ls -la" < /dev/null >> out.txt'
         command = '"%s" < /dev/null' % command
 
-        stdout, stderr, retcode = self.execute(command)
+        stdout, stderr, retcode = await self.execute(command)
         self.log.debug("command: {} returned {} --- {} --- {}".format(command, stdout, stderr, retcode))
         return (retcode == 0)
 
