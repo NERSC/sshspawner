@@ -1,9 +1,6 @@
+import os, asyncio, shlex
 
-import os
-from subprocess import Popen, PIPE, TimeoutExpired
-
-
-from traitlets import Bool, Unicode
+from traitlets import Bool, Unicode, Integer
 from tornado import gen
 
 
@@ -11,6 +8,9 @@ from jupyterhub.spawner import Spawner
 
 
 class SSHSpawner(Spawner):
+    # override default from Spawner parent class since batch systems typically need longer
+    start_timeout = Integer(300).tag(config=True)
+    
     remote_host = Unicode('remote_host',
                           help="""The SSH remote host to spawn sessions on."""
                           ).tag(config=True)
@@ -98,14 +98,13 @@ class SSHSpawner(Spawner):
         """
         return self.gsi_key_path.replace("%U", self.user.name)
 
-    def execute(self, command=None, stdin=None):
+    async def execute(self, command=None, stdin=None):
         """
         command: command to execute  (via bash -c command)
         stdin: script to pass in via stdin (via 'bash -s' < stdin)
-
         executes command on remote system "command" and "stdin" are mutually exclusive
-
         """
+
         ssh_env = os.environ.copy()
 
         username = self.get_remote_user(self.user.name)
@@ -118,20 +117,37 @@ class SSHSpawner(Spawner):
 
         if self.use_gsi:
             ssh_env['X509_USER_CERT'] = self.get_gsi_cert()
-            ssh_env['X509_USER_KEY'] = self.get_gsi_key()
+            ssh_env['X509_USER_KEY']  = self.get_gsi_key()
         elif self.ssh_keyfile:
             ssh_args += " -i {keyfile}".format(
                     keyfile=self.ssh_keyfile.replace("%U", self.user.name))
             ssh_args += " -o preferredauthentications=publickey"
 
-        # This is not very good at handling nested quotes - avoid using quotes in
-        # the command and use wrapper scripts as much as possible
-        if stdin:
-            command = "{ssh_command} {flags} {hostname} 'bash -s' < {stdin}".format(
+        # DRY (don't repeat yourself)
+        def split_into_arguments(self, command):
+            self.log.debug("command: {}".format(command))
+            commands = shlex.split(command)
+            self.log.debug("shlex parsed command as: " +"{{"+ "}}  {{".join(commands) +"}}")
+            return commands
+    
+        if stdin is not None:
+            command = "{ssh_command} {flags} {hostname} 'bash -s'".format(
                 ssh_command=self.ssh_command,
                 flags=ssh_args,
                 hostname=self.remote_host,
                 stdin=stdin)
+
+            commands = split_into_arguments(self, command)
+            # the variable stdin above is the path to a shell script, but what the process requires as stdin is the content of the file itself as a buffer/bytes
+            stdin = open(stdin, "rb")
+            # it ^ might be better if this were an asyncio.streamwriter or asyncio.subprocess.PIPE, but this still works -- consider it a proof of concept.
+
+            proc = await asyncio.create_subprocess_exec(*commands,
+                                            stdin=stdin, 
+                                            stdout=asyncio.subprocess.PIPE, 
+                                            stderr=asyncio.subprocess.PIPE,
+                                            env=ssh_env)
+                        
         else:
             command = "{ssh_command} {flags} {hostname} bash -c '{command}'".format(
                 ssh_command=self.ssh_command,
@@ -139,22 +155,43 @@ class SSHSpawner(Spawner):
                 hostname=self.remote_host,
                 command=command)
 
-        self.log.debug("command: {}".format(command))
-        proc = Popen(command, stdout=PIPE, stderr=PIPE,
-                     shell=True, env=ssh_env)
+            commands = split_into_arguments(self, command)
+
+            proc = await asyncio.create_subprocess_exec(*commands,
+                                            stdout=asyncio.subprocess.PIPE, 
+                                            stderr=asyncio.subprocess.PIPE,
+                                            env=ssh_env)
+        
+        # DRY
+        def log_process(self, returncode, stdout, stderr):
+            def bytes_to_string(bytes):
+                return bytes.decode().strip()
+            stdout, stderr = (bytes_to_string(stdout), bytes_to_string(stderr))
+            self.log.debug("subprocess returned exitcode: %s" % returncode)
+            self.log.debug("subprocess returned standard output: %s" % stdout)
+            self.log.debug("subprocess returned standard error: %s" % stderr)
 
         try:
-            stdout, stderr = proc.communicate(timeout=10)
-        except TimeoutExpired:
-            self.log.debug("execute timed out")
+            stdout, stderr = await proc.communicate()
+        
+        # catch wildcard exception
+        except Exception as e:
+            self.log.debug("execute raised exception %s when trying to run command: %s" % (e, command))
             proc.kill()
-            self.log.debug("execute timed out done kill")
-            stdout, stderr = proc.communicate()
-            self.log.debug("execute timed out done communicate")
-
-        returncode = proc.returncode
+            self.log.debug("execute failed done kill")
+            stdout, stderr = await proc.communicate()
+            self.log.debug("execute failed done communicate")
+            log_process(self, proc.returncode, stdout, stderr)
+            raise e
+        else:
+            returncode = proc.returncode
+            # account for instances where no Python exceptions, but shell process returns with non-zero exit status
+            if returncode != 0:
+                self.log.debug("execute failed for command: %s" % command)
+                log_process(self, returncode, stdout, stderr)
+                
         return (stdout, stderr, returncode)
-
+    
     def user_env(self):
 
         env = super(SSHSpawner, self).get_env()
@@ -181,7 +218,7 @@ class SSHSpawner(Spawner):
 
         return env
 
-    def exec_notebook(self, command):
+    async def exec_notebook(self, command):
         env = self.user_env()
         bash_script_str = "#!/bin/bash\n"
 
@@ -203,8 +240,13 @@ class SSHSpawner(Spawner):
         run_script = "/tmp/{}_run.sh".format(self.user.name)
         with open(run_script, "w") as f:
             f.write(bash_script_str)
+        if not os.path.isfile(run_script):
+            raise Exception("The file " + run_script + "was not created.")
+        else:
+            with open(run_script, "r") as f:
+                self.log.debug(run_script + " was written as:\n" + f.read())
 
-        stdout, stderr, retcode = self.execute(command, stdin=run_script)
+        stdout, stderr, retcode = await self.execute(command, stdin=run_script)
         self.log.debug("exec_notebook status={}".format(retcode))
         if stdout != b'':
             pid = int(stdout)
@@ -213,7 +255,7 @@ class SSHSpawner(Spawner):
 
         return pid
 
-    def remote_random_port(self):
+    async def remote_random_port(self):
         # command = self.remote_port_command
         # NERSC local mod
         command = self.remote_port_command
@@ -223,7 +265,7 @@ class SSHSpawner(Spawner):
         # eg. bash -c '"ls -la" < /dev/null >> out.txt'
         command = '"%s" < /dev/null' % command
 
-        stdout, stderr, retcode = self.execute(command)
+        stdout, stderr, retcode = await self.execute(command)
 
         if stdout != b'':
             port = int(stdout)
@@ -233,7 +275,7 @@ class SSHSpawner(Spawner):
         self.log.debug("port={}".format(port))
         return port
 
-    def remote_signal(self, sig):
+    async def remote_signal(self, sig):
         """
         simple implementation of signal, which we can use
         when we are using setuid (we are root)
@@ -245,16 +287,15 @@ class SSHSpawner(Spawner):
         # eg. bash -c '"ls -la" < /dev/null >> out.txt'
         command = '"%s" < /dev/null' % command
 
-        stdout, stderr, retcode = self.execute(command)
+        stdout, stderr, retcode = await self.execute(command)
         self.log.debug("command: {} returned {} --- {} --- {}".format(command, stdout, stderr, retcode))
         return (retcode == 0)
 
-    @gen.coroutine
-    def start(self):
+    async def start(self):
         """Start the process"""
         self.log.debug("Entering start")
 
-        port = self.remote_random_port()
+        port = await self.remote_random_port()
         if port is None or port == 0:
             return False
         cmd = []
@@ -277,16 +318,16 @@ class SSHSpawner(Spawner):
         # time.sleep(2)
         # import pdb; pdb.set_trace()
 
-        self.pid = self.exec_notebook(remote_cmd)
+        self.pid = await self.exec_notebook(remote_cmd)
 
         self.log.debug("Starting User: {}, PID: {}".format(self.user.name, self.pid))
 
         if self.pid < 0:
             return None
+        # DEPRECATION: Spawner.start should return a url or (ip, port) tuple in JupyterHub >= 0.9
         return (self.remote_host, port)
 
-    @gen.coroutine
-    def poll(self):
+    async def poll(self):
         self.log.debug("Entering poll")
 
         if not self.pid:
@@ -295,7 +336,7 @@ class SSHSpawner(Spawner):
             return 0
 
         # send signal 0 to check if PID exists
-        alive = self.remote_signal(0)
+        alive = await self.remote_signal(0)
         self.log.debug("Polling returned {}".format(alive))
 
         if not alive:
@@ -304,11 +345,10 @@ class SSHSpawner(Spawner):
         else:
             return None
 
-    @gen.coroutine
-    def stop(self, now=False):
+    async def stop(self, now=False):
         self.log.debug("Entering stop")
 
-        alive = self.remote_signal(15)
+        alive = await self.remote_signal(15)
 
         self.clear_state()
 
