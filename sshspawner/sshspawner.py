@@ -105,11 +105,7 @@ class SSHSpawner(Spawner):
         executes command on remote system "command" and "stdin" are mutually exclusive
         """
 
-        # Have to change the environment manually before running the process.
-        # asyncio.subprocess.Process does not have an `env` attribute, the way subprocess.Popen does.
-        backup_env = os.environ.copy()
-        # Want a copy by value, not reference
-        ssh_env = backup_env.copy()
+        ssh_env = os.environ.copy()
 
         username = self.get_remote_user(self.user.name)
 
@@ -126,8 +122,6 @@ class SSHSpawner(Spawner):
             ssh_args += " -i {keyfile}".format(
                     keyfile=self.ssh_keyfile.replace("%U", self.user.name))
             ssh_args += " -o preferredauthentications=publickey"
-
-        os.environ.update(ssh_env)
 
         # This is not very good at handling nested quotes - avoid using quotes in
         # the command and use wrapper scripts as much as possible
@@ -146,25 +140,20 @@ class SSHSpawner(Spawner):
 
         self.log.debug("command: {}".format(command))
 
+        proc = await asyncio.create_subprocess_shell(command, 
+                                                    stdout=asyncio.subprocess.PIPE, 
+                                                    stderr=asyncio.subprocess.PIPE,
+                                                    env=ssh_env)
         try:
-            proc = await asyncio.create_subprocess_shell(command, 
-                                                        stdout=asyncio.subprocess.PIPE, 
-                                                        stderr=asyncio.subprocess.PIPE)
-            try:
-                stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
-            except asyncio.TimeoutError:
-                self.log.debug("execute timed out")
-                proc.kill()
-                self.log.debug("execute timed out done kill")
-                stdout, stderr = await proc.communicate()
-                self.log.debug("execute timed out done communicate")
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
+        except asyncio.TimeoutError:
+            self.log.debug("execute timed out")
+            proc.kill()
+            self.log.debug("execute timed out done kill")
+            stdout, stderr = await proc.communicate()
+            self.log.debug("execute timed out done communicate")
 
-            returncode = proc.returncode
-
-        # Even if the above fails, we still want our environment variables reset and cleared of sensitive information.
-        finally:
-            os.environ.clear()
-            os.environ.update(backup_env)
+        returncode = proc.returncode
 
         return (stdout, stderr, returncode)
     
