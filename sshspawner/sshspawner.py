@@ -98,14 +98,13 @@ class SSHSpawner(Spawner):
         """
         return self.gsi_key_path.replace("%U", self.user.name)
 
-    def execute(self, command=None, stdin=None):
+    async def execute(self, command=None, stdin=None):
         """
         command: command to execute  (via bash -c command)
         stdin: script to pass in via stdin (via 'bash -s' < stdin)
-
         executes command on remote system "command" and "stdin" are mutually exclusive
-
         """
+
         ssh_env = os.environ.copy()
 
         username = self.get_remote_user(self.user.name)
@@ -118,7 +117,7 @@ class SSHSpawner(Spawner):
 
         if self.use_gsi:
             ssh_env['X509_USER_CERT'] = self.get_gsi_cert()
-            ssh_env['X509_USER_KEY'] = self.get_gsi_key()
+            ssh_env['X509_USER_KEY']  = self.get_gsi_key()
         elif self.ssh_keyfile:
             ssh_args += " -i {keyfile}".format(
                     keyfile=self.ssh_keyfile.replace("%U", self.user.name))
@@ -140,21 +139,24 @@ class SSHSpawner(Spawner):
                 command=command)
 
         self.log.debug("command: {}".format(command))
-        proc = Popen(command, stdout=PIPE, stderr=PIPE,
-                     shell=True, env=ssh_env)
 
+        proc = await asyncio.create_subprocess_shell(command, 
+                                                    stdout=asyncio.subprocess.PIPE, 
+                                                    stderr=asyncio.subprocess.PIPE,
+                                                    env=ssh_env)
         try:
-            stdout, stderr = proc.communicate(timeout=10)
-        except TimeoutExpired:
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
+        except asyncio.TimeoutError:
             self.log.debug("execute timed out")
             proc.kill()
             self.log.debug("execute timed out done kill")
-            stdout, stderr = proc.communicate()
+            stdout, stderr = await proc.communicate()
             self.log.debug("execute timed out done communicate")
 
         returncode = proc.returncode
-        return (stdout, stderr, returncode)
 
+        return (stdout, stderr, returncode)
+    
     def user_env(self):
 
         env = super(SSHSpawner, self).get_env()
@@ -181,7 +183,7 @@ class SSHSpawner(Spawner):
 
         return env
 
-    def exec_notebook(self, command):
+    async def exec_notebook(self, command):
         env = self.user_env()
         bash_script_str = "#!/bin/bash\n"
 
@@ -204,7 +206,7 @@ class SSHSpawner(Spawner):
         with open(run_script, "w") as f:
             f.write(bash_script_str)
 
-        stdout, stderr, retcode = self.execute(command, stdin=run_script)
+        stdout, stderr, retcode = await self.execute(command, stdin=run_script)
         self.log.debug("exec_notebook status={}".format(retcode))
         if stdout != b'':
             pid = int(stdout)
@@ -213,7 +215,7 @@ class SSHSpawner(Spawner):
 
         return pid
 
-    def remote_random_port(self):
+    async def remote_random_port(self):
         # command = self.remote_port_command
         # NERSC local mod
         command = self.remote_port_command
@@ -223,7 +225,7 @@ class SSHSpawner(Spawner):
         # eg. bash -c '"ls -la" < /dev/null >> out.txt'
         command = '"%s" < /dev/null' % command
 
-        stdout, stderr, retcode = self.execute(command)
+        stdout, stderr, retcode = await self.execute(command)
 
         if stdout != b'':
             port = int(stdout)
@@ -233,7 +235,7 @@ class SSHSpawner(Spawner):
         self.log.debug("port={}".format(port))
         return port
 
-    def remote_signal(self, sig):
+    async def remote_signal(self, sig):
         """
         simple implementation of signal, which we can use
         when we are using setuid (we are root)
@@ -245,7 +247,7 @@ class SSHSpawner(Spawner):
         # eg. bash -c '"ls -la" < /dev/null >> out.txt'
         command = '"%s" < /dev/null' % command
 
-        stdout, stderr, retcode = self.execute(command)
+        stdout, stderr, retcode = await self.execute(command)
         self.log.debug("command: {} returned {} --- {} --- {}".format(command, stdout, stderr, retcode))
         return (retcode == 0)
 
