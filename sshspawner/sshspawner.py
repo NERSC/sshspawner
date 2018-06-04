@@ -144,7 +144,8 @@ class SSHSpawner(Spawner):
                                                     stderr=asyncio.subprocess.PIPE,
                                                     env=ssh_env)
         try:
-            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=10)
+            # changed the timeout to 300 temporarily for testing purposes
+            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
         except asyncio.TimeoutError:
             self.log.debug("execute timed out")
             proc.kill()
@@ -250,12 +251,11 @@ class SSHSpawner(Spawner):
         self.log.debug("command: {} returned {} --- {} --- {}".format(command, stdout, stderr, retcode))
         return (retcode == 0)
 
-    @gen.coroutine
-    def start(self):
+    async def start(self):
         """Start the process"""
         self.log.debug("Entering start")
 
-        port = yield self.remote_random_port()
+        port = await self.remote_random_port()
         if port is None or port == 0:
             return False
         cmd = []
@@ -278,7 +278,7 @@ class SSHSpawner(Spawner):
         # time.sleep(2)
         # import pdb; pdb.set_trace()
 
-        self.pid = yield self.exec_notebook(remote_cmd)
+        self.pid = await self.exec_notebook(remote_cmd)
 
         self.log.debug("Starting User: {}, PID: {}".format(self.user.name, self.pid))
 
@@ -286,8 +286,7 @@ class SSHSpawner(Spawner):
             return None
         return (self.remote_host, port)
 
-    @gen.coroutine
-    def poll(self):
+    async def poll(self):
         self.log.debug("Entering poll")
 
         if not self.pid:
@@ -296,7 +295,7 @@ class SSHSpawner(Spawner):
             return 0
 
         # send signal 0 to check if PID exists
-        alive = yield self.remote_signal(0)
+        alive = await self.remote_signal(0)
         self.log.debug("Polling returned {}".format(alive))
 
         if not alive:
@@ -305,11 +304,10 @@ class SSHSpawner(Spawner):
         else:
             return None
 
-    @gen.coroutine
-    def stop(self, now=False):
+   async def stop(self, now=False):
         self.log.debug("Entering stop")
 
-        alive = yield self.remote_signal(15)
+        alive = await self.remote_signal(15)
 
         self.clear_state()
 
