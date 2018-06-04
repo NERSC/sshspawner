@@ -304,7 +304,7 @@ class SSHSpawner(Spawner):
         else:
             return None
 
-   async def stop(self, now=False):
+    async def stop(self, now=False):
         self.log.debug("Entering stop")
 
         alive = await self.remote_signal(15)
