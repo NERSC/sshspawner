@@ -255,7 +255,7 @@ class SSHSpawner(Spawner):
         """Start the process"""
         self.log.debug("Entering start")
 
-        port = self.remote_random_port()
+        port = yield self.remote_random_port()
         if port is None or port == 0:
             return False
         cmd = []
@@ -278,7 +278,7 @@ class SSHSpawner(Spawner):
         # time.sleep(2)
         # import pdb; pdb.set_trace()
 
-        self.pid = self.exec_notebook(remote_cmd)
+        self.pid = yield self.exec_notebook(remote_cmd)
 
         self.log.debug("Starting User: {}, PID: {}".format(self.user.name, self.pid))
 
@@ -296,7 +296,7 @@ class SSHSpawner(Spawner):
             return 0
 
         # send signal 0 to check if PID exists
-        alive = self.remote_signal(0)
+        alive = yield self.remote_signal(0)
         self.log.debug("Polling returned {}".format(alive))
 
         if not alive:
@@ -309,7 +309,7 @@ class SSHSpawner(Spawner):
     def stop(self, now=False):
         self.log.debug("Entering stop")
 
-        alive = self.remote_signal(15)
+        alive = yield self.remote_signal(15)
 
         self.clear_state()
 
