@@ -144,7 +144,7 @@ class SSHSpawner(Spawner):
                                                     stderr=asyncio.subprocess.PIPE,
                                                     env=ssh_env)
         try:
-            # changed the timeout to 300 temporarily for testing purposes
+            # changed the timeout to 300 temporarily for testing purposes (and because that's BatchSpawner's default)
             stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
         except asyncio.TimeoutError:
             self.log.debug("execute timed out")
