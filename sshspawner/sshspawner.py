@@ -2,7 +2,7 @@ import os, asyncio
 from subprocess import Popen, PIPE, TimeoutExpired
 
 
-from traitlets import Bool, Unicode
+from traitlets import Bool, Unicode, Integer
 from tornado import gen
 
 
