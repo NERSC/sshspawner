@@ -167,9 +167,6 @@ class SSHSpawner(Spawner):
             returncode = proc.returncode
             # account for instances where no Python exceptions, but shell process returns with non-zero exit status
             if returncode != 0:
-                # outputs of communicate are bytes, not strings, so have to decode and strip them first before putting logs
-                stdout = stdout.decode.strip()
-                stderr = stderr.decode.strip()
                 self.log.debug("execute failed for command: %s" % command)
                 self.log.debug("subprocess returned exitcode %s" % returncode)
                 self.log.debug("subprocess returned standard output %s" % stdout)
