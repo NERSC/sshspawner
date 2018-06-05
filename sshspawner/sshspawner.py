@@ -10,6 +10,9 @@ from jupyterhub.spawner import Spawner
 
 
 class SSHSpawner(Spawner):
+    # override default since batch systems typically need longer
+    start_timeout = Integer(10).tag(config=True)
+    
     remote_host = Unicode('remote_host',
                           help="""The SSH remote host to spawn sessions on."""
                           ).tag(config=True)
