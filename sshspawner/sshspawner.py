@@ -150,27 +150,37 @@ class SSHSpawner(Spawner):
             stdout, stderr = await proc.communicate()
         # catch wildcard exception
         except:
-            self.log.debug("execute failed for command: %s" % command)
+            self.log.debug("execute raised an exception when trying to run command: %s" % command)
             proc.kill()
             self.log.debug("execute failed done kill")
             stdout, stderr = await proc.communicate()
+            # outputs of communicate are bytes, not strings, so have to decode and strip them first before putting in logs
+            stdout = stdout.decode.strip()
+            stderr = stderr.decode.strip()
             self.log.debug("execute failed done communicate")
-            self.log.debug("Subprocess returned exitcode %s" % proc.returncode)
-            self.log.debug("Subprocess returned standard output %s" % stdout)
-            self.log.debug("Subprocess returned standard error %s" % stderr)
+            self.log.debug("subprocess returned exitcode %s" % proc.returncode)
+            self.log.debug("subprocess returned standard output %s" % stdout)
+            self.log.debug("subprocess returned standard error %s" % stderr)
             # raises the wildcard exception so we can see what it was
             raise
         else:
             returncode = proc.returncode
             # account for instances where no Python exceptions, but shell process returns with non-zero exit status
             if returncode != 0:
+                # outputs of communicate are bytes, not strings, so have to decode and strip them first before putting logs
+                stdout = stdout.decode.strip()
+                stderr = stderr.decode.strip()
                 self.log.debug("execute failed for command: %s" % command)
                 self.log.debug("subprocess returned exitcode %s" % returncode)
                 self.log.debug("subprocess returned standard output %s" % stdout)
                 self.log.debug("subprocess returned standard error %s" % stderr)
-                # raise an exception so execution doesn't continue with result of failed shell process
-                raise RunTimeError(stderr)
-
+                # BatchSpawner would raise an error here, but the other methods which call execute expect it to return output values so those values can go into their logs
+                # raising an exception here would prevent that extra logging functionality (maybe)
+                
+        # first two entries of tuple are bytes, not strings (in contrast, BatchSpawner returns only stdout, and as a string)
+        # exec_notebook and remote_random_port expect stdout to be bytes
+        # returncode used in logs of exec_notebook and return_signal, and is used for the Boolean value which return_signal returns
+        # stderr only shows up in the log of remote_signal
         return (stdout, stderr, returncode)
     
     def user_env(self):
