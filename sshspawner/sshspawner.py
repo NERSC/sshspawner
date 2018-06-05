@@ -146,18 +146,30 @@ class SSHSpawner(Spawner):
                                                     stdout=asyncio.subprocess.PIPE, 
                                                     stderr=asyncio.subprocess.PIPE,
                                                     env=ssh_env)
-#        try:
-            # changed the timeout to 300 temporarily for testing purposes (and because that's BatchSpawner's default)
-#            stdout, stderr = await asyncio.wait_for(proc.communicate(), timeout=300)
-        stdout, stderr = await proc.communicate()
-#        except asyncio.TimeoutError:
-#            self.log.debug("execute timed out")
-#            proc.kill()
-#            self.log.debug("execute timed out done kill")
-#            stdout, stderr = await proc.communicate()
-#            self.log.debug("execute timed out done communicate")
-
-        returncode = proc.returncode
+        try:
+            stdout, stderr = await proc.communicate()
+        # catch wildcard exception
+        except:
+            self.log.debug("execute failed for command: %s" % command)
+            proc.kill()
+            self.log.debug("execute failed done kill")
+            stdout, stderr = await proc.communicate()
+            self.log.debug("execute failed done communicate")
+            self.log.debug("Subprocess returned exitcode %s" % proc.returncode)
+            self.log.debug("Subprocess returned standard output %s" % stdout)
+            self.log.debug("Subprocess returned standard error %s" % stderr)
+            # raises the wildcard exception so we can see what it was
+            raise
+        else:
+            returncode = proc.returncode
+            # account for instances where no Python exceptions, but shell process returns with non-zero exit status
+            if returncode != 0:
+                self.log.debug("execute failed for command: %s" % command)
+                self.log.debug("subprocess returned exitcode %s" % returncode)
+                self.log.debug("subprocess returned standard output %s" % stdout)
+                self.log.debug("subprocess returned standard error %s" % stderr)
+                # raise an exception so execution doesn't continue with result of failed shell process
+                raise RunTimeError(stderr)
 
         return (stdout, stderr, returncode)
     
