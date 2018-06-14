@@ -1,6 +1,4 @@
-import os, asyncio
-from subprocess import Popen, PIPE, TimeoutExpired
-
+import os, asyncio, shlex
 
 from traitlets import Bool, Unicode, Integer
 from tornado import gen
@@ -142,7 +140,11 @@ class SSHSpawner(Spawner):
 
         self.log.debug("command: {}".format(command))
 
-        proc = await asyncio.create_subprocess_shell(command, 
+        # following recommendation here
+        commands = shlex.split(command)
+
+        # this should work I think: https://stackoverflow.com/questions/3941517/converting-list-to-args-when-calling-function
+        proc = await asyncio.create_subprocess_exec(*commands, 
                                                     stdout=asyncio.subprocess.PIPE, 
                                                     stderr=asyncio.subprocess.PIPE,
                                                     env=ssh_env)
