@@ -231,6 +231,9 @@ class SSHSpawner(Spawner):
             # https://stackoverflow.com/a/82852/9899076
         if not os.path.isfile(run_script):
             raise Exception("The file " + run_script + "was not created.")
+        else:
+            with open(run_script, "r") as f:
+                self.log.debug(run_script + " was written as: " + f.read())
 
         stdout, stderr, retcode = await self.execute(command, stdin=run_script)
         self.log.debug("exec_notebook status={}".format(retcode))
@@ -310,6 +313,7 @@ class SSHSpawner(Spawner):
 
         if self.pid < 0:
             return None
+        # DEPRECATION: Spawner.start should return a url or (ip, port) tuple in JupyterHub >= 0.9
         return (self.remote_host, port)
 
     async def poll(self):
