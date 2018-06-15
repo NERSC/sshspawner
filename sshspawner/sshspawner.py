@@ -132,7 +132,7 @@ class SSHSpawner(Spawner):
                 #flags=ssh_args,
                 #hostname=self.remote_host,
                 #stdin=stdin)
-            command = "{ssh_command} {flags} {hostname} bash -s < {stdin}".format(
+            command = "{ssh_command} {flags} {hostname} bash '-s < {stdin}'".format(
                 ssh_command=self.ssh_command,
                 flags=ssh_args,
                 hostname=self.remote_host,
