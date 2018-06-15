@@ -170,6 +170,7 @@ class SSHSpawner(Spawner):
             # account for instances where no Python exceptions, but shell process returns with non-zero exit status
             if returncode != 0:
                 self.log.debug("execute failed for command: %s" % command)
+                self.log.debug("shlex parsed command as:" +"|"+ "| |".join(commands) +"|")
                 self.log.debug("subprocess returned exitcode %s" % returncode)
                 self.log.debug("subprocess returned standard output %s" % stdout)
                 self.log.debug("subprocess returned standard error %s" % stderr)
