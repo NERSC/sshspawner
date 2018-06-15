@@ -147,7 +147,9 @@ class SSHSpawner(Spawner):
                                             stdout=asyncio.subprocess.PIPE, 
                                             stderr=asyncio.subprocess.PIPE,
                                             env=ssh_env)
-            proc.stdin.write(stdin.encode())
+            # the variable stdin above is the path to a shell script, but what the process requires as stdin is the content of the file itself
+            stdin = open(stdin, "rb")
+            proc.stdin.write(stdin)
             
         else:
             command = "{ssh_command} {flags} {hostname} bash -c '{command}'".format(
