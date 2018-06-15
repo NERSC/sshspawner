@@ -225,8 +225,6 @@ class SSHSpawner(Spawner):
         run_script = "/tmp/{}_run.sh".format(self.user.name)
         with open(run_script, "w") as f:
             f.write(bash_script_str)
-            # self.log.debug("the following was written to the file '" + run_script + "':" + f.read())
-            # https://stackoverflow.com/a/82852/9899076
         if not os.path.isfile(run_script):
             raise Exception("The file " + run_script + "was not created.")
         else:
