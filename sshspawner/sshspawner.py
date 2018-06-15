@@ -142,45 +142,41 @@ class SSHSpawner(Spawner):
 
         # following recommendation here
         commands = shlex.split(command)
+        self.log.debug("shlex parsed command as:" +"|"+ "| |".join(commands) +"|")
 
         # this should work I think: https://stackoverflow.com/questions/3941517/converting-list-to-args-when-calling-function
         proc = await asyncio.create_subprocess_exec(*commands, 
                                                     stdout=asyncio.subprocess.PIPE, 
                                                     stderr=asyncio.subprocess.PIPE,
                                                     env=ssh_env)
+        # DRY (don't repeat yourself)
+        def log_process(self, returncode, stdout, stderr):
+            def bytes_to_string(bytes):
+                return bytes.decode().strip()
+            stdout, stderr = (bytes_to_string(stdout), bytes_to_string(stderr))
+            self.log.debug("subprocess returned exitcode %s" % returncode)
+            self.log.debug("subprocess returned standard output %s" % stdout)
+            self.log.debug("subprocess returned standard error %s" % stderr)
+
         try:
             stdout, stderr = await proc.communicate()
+        
         # catch wildcard exception
-        except:
-            self.log.debug("execute raised an exception when trying to run command: %s" % command)
+        except Exception as e:
+            self.log.debug("execute raised exception %s when trying to run command: %s" % (e, command))
             proc.kill()
             self.log.debug("execute failed done kill")
             stdout, stderr = await proc.communicate()
-            # outputs of communicate are bytes, not strings, so have to decode and strip them first before putting in logs
-            stdout = stdout.decode.strip()
-            stderr = stderr.decode.strip()
             self.log.debug("execute failed done communicate")
-            self.log.debug("subprocess returned exitcode %s" % proc.returncode)
-            self.log.debug("subprocess returned standard output %s" % stdout)
-            self.log.debug("subprocess returned standard error %s" % stderr)
-            # raises the wildcard exception so we can see what it was
-            raise
+            log_process(self, proc.returncode, stdout, stderr)
+            raise e
         else:
             returncode = proc.returncode
             # account for instances where no Python exceptions, but shell process returns with non-zero exit status
             if returncode != 0:
                 self.log.debug("execute failed for command: %s" % command)
-                self.log.debug("shlex parsed command as:" +"|"+ "| |".join(commands) +"|")
-                self.log.debug("subprocess returned exitcode %s" % returncode)
-                self.log.debug("subprocess returned standard output %s" % stdout)
-                self.log.debug("subprocess returned standard error %s" % stderr)
-                # BatchSpawner would raise an error here, but the other methods which call execute expect it to return output values so those values can go into their logs
-                # raising an exception here would prevent that extra logging functionality (maybe)
+                log_process(self, returncode, stdout, stderr)
                 
-        # first two entries of tuple are bytes, not strings (in contrast, BatchSpawner returns only stdout, and as a string)
-        # exec_notebook and remote_random_port expect stdout to be bytes
-        # returncode used in logs of exec_notebook and return_signal, and is used for the Boolean value which return_signal returns
-        # stderr only shows up in the log of remote_signal
         return (stdout, stderr, returncode)
     
     def user_env(self):
