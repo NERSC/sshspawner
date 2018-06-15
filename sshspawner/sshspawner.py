@@ -140,7 +140,7 @@ class SSHSpawner(Spawner):
                 hostname=self.remote_host,
                 stdin=stdin)
 
-            commands = command_parser(command)
+            commands = command_parser(self, command)
 
             proc = await asyncio.create_subprocess_exec(*commands,
                                             stdin=asyncio.subprocess.PIPE, 
@@ -156,7 +156,7 @@ class SSHSpawner(Spawner):
                 hostname=self.remote_host,
                 command=command)
 
-            commands = command_parser(command)
+            commands = command_parser(self, command)
 
             proc = await asyncio.create_subprocess_exec(*commands,
                                             stdout=asyncio.subprocess.PIPE, 
