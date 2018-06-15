@@ -146,7 +146,7 @@ class SSHSpawner(Spawner):
         commands = shlex.split(command)
         self.log.debug("shlex parsed command as: " +"{{"+ "}}  {{".join(commands) +"}}")
 
-        proc = await asyncio.create_subprocess_exec(*commands, 
+        proc = await asyncio.create_subprocess_exec(*commands, stdin=input_pipe, 
                                                     stdout=asyncio.subprocess.PIPE, 
                                                     stderr=asyncio.subprocess.PIPE,
                                                     env=ssh_env)
