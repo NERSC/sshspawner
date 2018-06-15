@@ -125,8 +125,8 @@ class SSHSpawner(Spawner):
 
         # This is not very good at handling nested quotes - avoid using quotes in
         # the command and use wrapper scripts as much as possible
-        if stdin:
-            command = "{ssh_command} {flags} {hostname} 'bash -s' < {stdin}".format(
+        if stdin is not None:
+            command = "{ssh_command} {flags} {hostname} 'bash -s'".format(
                 ssh_command=self.ssh_command,
                 flags=ssh_args,
                 hostname=self.remote_host,
@@ -143,7 +143,7 @@ class SSHSpawner(Spawner):
         commands = shlex.split(command)
         self.log.debug("shlex parsed command as: " +"{{"+ "}}  {{".join(commands) +"}}")
 
-        proc = await asyncio.create_subprocess_exec(*commands, 
+        proc = await asyncio.create_subprocess_exec(*commands, stdin=stdin, 
                                                     stdout=asyncio.subprocess.PIPE, 
                                                     stderr=asyncio.subprocess.PIPE,
                                                     env=ssh_env)
