@@ -141,16 +141,15 @@ class SSHSpawner(Spawner):
                 stdin=stdin)
 
             commands = command_parser(self, command)
+             # the variable stdin above is the path to a shell script, but what the process requires as stdin is the content of the file itself
+            stdin = open(stdin, "rb")
 
             proc = await asyncio.create_subprocess_exec(*commands,
-                                            stdin=asyncio.subprocess.PIPE, 
+                                            stdin=stdin, 
                                             stdout=asyncio.subprocess.PIPE, 
                                             stderr=asyncio.subprocess.PIPE,
                                             env=ssh_env)
-            # the variable stdin above is the path to a shell script, but what the process requires as stdin is the content of the file itself
-            stdin = open(stdin, "rb")
-            proc.stdin.write(stdin)
-            
+                        
         else:
             command = "{ssh_command} {flags} {hostname} bash -c '{command}'".format(
                 ssh_command=self.ssh_command,
