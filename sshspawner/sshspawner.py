@@ -140,13 +140,18 @@ class SSHSpawner(Spawner):
 
         self.log.debug("command: {}".format(command))
 
+        input_pipe = asyncio.subprocess.PIPE
+        
+
         commands = shlex.split(command)
         self.log.debug("shlex parsed command as: " +"{{"+ "}}  {{".join(commands) +"}}")
 
-        proc = await asyncio.create_subprocess_exec(*commands, stdin=stdin, 
+        proc = await asyncio.create_subprocess_exec(*commands, 
                                                     stdout=asyncio.subprocess.PIPE, 
                                                     stderr=asyncio.subprocess.PIPE,
                                                     env=ssh_env)
+        proc.stdin.write(stdin.encode())
+        
         # DRY (don't repeat yourself)
         def log_process(self, returncode, stdout, stderr):
             def bytes_to_string(bytes):
