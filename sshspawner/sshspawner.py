@@ -126,13 +126,7 @@ class SSHSpawner(Spawner):
         # This is not very good at handling nested quotes - avoid using quotes in
         # the command and use wrapper scripts as much as possible
         if stdin:
-            # leaving original version here because my attempted change will probably mess everything up. Fingers crossed.
-            # command = "{ssh_command} {flags} {hostname} 'bash -s' < {stdin}".format(
-                #ssh_command=self.ssh_command,
-                #flags=ssh_args,
-                #hostname=self.remote_host,
-                #stdin=stdin)
-            command = "{ssh_command} {flags} {hostname} 'bash -s' '< {stdin}'".format(
+            command = "{ssh_command} {flags} {hostname} 'bash -s' < {stdin}".format(
                 ssh_command=self.ssh_command,
                 flags=ssh_args,
                 hostname=self.remote_host,
@@ -146,11 +140,9 @@ class SSHSpawner(Spawner):
 
         self.log.debug("command: {}".format(command))
 
-        # following recommendation here
         commands = shlex.split(command)
         self.log.debug("shlex parsed command as: " +"{{"+ "}}  {{".join(commands) +"}}")
 
-        # this should work I think: https://stackoverflow.com/questions/3941517/converting-list-to-args-when-calling-function
         proc = await asyncio.create_subprocess_exec(*commands, 
                                                     stdout=asyncio.subprocess.PIPE, 
                                                     stderr=asyncio.subprocess.PIPE,
