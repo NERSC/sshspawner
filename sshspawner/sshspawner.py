@@ -142,7 +142,7 @@ class SSHSpawner(Spawner):
 
         # following recommendation here
         commands = shlex.split(command)
-        self.log.debug("shlex parsed command as:" +"|"+ "| |".join(commands) +"|")
+        self.log.debug("shlex parsed command as:" +"{{"+ "}}  {{".join(commands) +"}}")
 
         # this should work I think: https://stackoverflow.com/questions/3941517/converting-list-to-args-when-calling-function
         proc = await asyncio.create_subprocess_exec(*commands, 
@@ -154,16 +154,16 @@ class SSHSpawner(Spawner):
             def bytes_to_string(bytes):
                 return bytes.decode().strip()
             stdout, stderr = (bytes_to_string(stdout), bytes_to_string(stderr))
-            self.log.debug("subprocess returned exitcode %s" % returncode)
-            self.log.debug("subprocess returned standard output %s" % stdout)
-            self.log.debug("subprocess returned standard error %s" % stderr)
+            self.log.debug("subprocess returned exitcode: %s" % returncode)
+            self.log.debug("subprocess returned standard output: '%s'" % stdout)
+            self.log.debug("subprocess returned standard error: '%s'" % stderr)
 
         try:
             stdout, stderr = await proc.communicate()
         
         # catch wildcard exception
         except Exception as e:
-            self.log.debug("execute raised exception %s when trying to run command: %s" % (e, command))
+            self.log.debug("execute raised exception '%s' when trying to run command: '%s'" % (e, command))
             proc.kill()
             self.log.debug("execute failed done kill")
             stdout, stderr = await proc.communicate()
@@ -174,7 +174,7 @@ class SSHSpawner(Spawner):
             returncode = proc.returncode
             # account for instances where no Python exceptions, but shell process returns with non-zero exit status
             if returncode != 0:
-                self.log.debug("execute failed for command: %s" % command)
+                self.log.debug("execute failed for command: '%s'" % command)
                 log_process(self, returncode, stdout, stderr)
                 
         return (stdout, stderr, returncode)
@@ -227,6 +227,7 @@ class SSHSpawner(Spawner):
         run_script = "/tmp/{}_run.sh".format(self.user.name)
         with open(run_script, "w") as f:
             f.write(bash_script_str)
+            self.log.debug("the following was written to the file '" + run_script + "':" + f.read())
 
         stdout, stderr, retcode = await self.execute(command, stdin=run_script)
         self.log.debug("exec_notebook status={}".format(retcode))
