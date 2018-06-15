@@ -229,7 +229,7 @@ class SSHSpawner(Spawner):
             raise Exception("The file " + run_script + "was not created.")
         else:
             with open(run_script, "r") as f:
-                self.log.debug(run_script + " was written as:\n " + f.read())
+                self.log.debug(run_script + " was written as:\n" + f.read())
 
         stdout, stderr, retcode = await self.execute(command, stdin=run_script)
         self.log.debug("exec_notebook status={}".format(retcode))
