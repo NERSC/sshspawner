@@ -126,7 +126,13 @@ class SSHSpawner(Spawner):
         # This is not very good at handling nested quotes - avoid using quotes in
         # the command and use wrapper scripts as much as possible
         if stdin:
-            command = "{ssh_command} {flags} {hostname} 'bash -s' < {stdin}".format(
+            # leaving original version here because my attempted change will probably mess everything up. Fingers crossed.
+            # command = "{ssh_command} {flags} {hostname} 'bash -s' < {stdin}".format(
+                #ssh_command=self.ssh_command,
+                #flags=ssh_args,
+                #hostname=self.remote_host,
+                #stdin=stdin)
+            command = "{ssh_command} {flags} {hostname} bash -s < {stdin}".format(
                 ssh_command=self.ssh_command,
                 flags=ssh_args,
                 hostname=self.remote_host,
