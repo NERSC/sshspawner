@@ -123,16 +123,13 @@ class SSHSpawner(Spawner):
                     keyfile=self.ssh_keyfile.replace("%U", self.user.name))
             ssh_args += " -o preferredauthentications=publickey"
 
-        # DRY
-        def command_parser(self, command):
+        # DRY (don't repeat yourself)
+        def split_into_arguments(self, command):
             self.log.debug("command: {}".format(command))
             commands = shlex.split(command)
             self.log.debug("shlex parsed command as: " +"{{"+ "}}  {{".join(commands) +"}}")
             return commands
-            
-
-        # This is not very good at handling nested quotes - avoid using quotes in
-        # the command and use wrapper scripts as much as possible
+    
         if stdin is not None:
             command = "{ssh_command} {flags} {hostname} 'bash -s'".format(
                 ssh_command=self.ssh_command,
@@ -140,9 +137,10 @@ class SSHSpawner(Spawner):
                 hostname=self.remote_host,
                 stdin=stdin)
 
-            commands = command_parser(self, command)
-             # the variable stdin above is the path to a shell script, but what the process requires as stdin is the content of the file itself
+            commands = split_into_arguments(self, command)
+            # the variable stdin above is the path to a shell script, but what the process requires as stdin is the content of the file itself as a buffer/bytes
             stdin = open(stdin, "rb")
+            # it ^ might be better if this were an asyncio.streamwriter or asyncio.subprocess.PIPE, but this still works -- consider it a proof of concept.
 
             proc = await asyncio.create_subprocess_exec(*commands,
                                             stdin=stdin, 
@@ -157,14 +155,14 @@ class SSHSpawner(Spawner):
                 hostname=self.remote_host,
                 command=command)
 
-            commands = command_parser(self, command)
+            commands = split_into_arguments(self, command)
 
             proc = await asyncio.create_subprocess_exec(*commands,
                                             stdout=asyncio.subprocess.PIPE, 
                                             stderr=asyncio.subprocess.PIPE,
                                             env=ssh_env)
         
-        # DRY (don't repeat yourself)
+        # DRY
         def log_process(self, returncode, stdout, stderr):
             def bytes_to_string(bytes):
                 return bytes.decode().strip()
