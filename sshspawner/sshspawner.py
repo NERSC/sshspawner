@@ -123,6 +123,14 @@ class SSHSpawner(Spawner):
                     keyfile=self.ssh_keyfile.replace("%U", self.user.name))
             ssh_args += " -o preferredauthentications=publickey"
 
+        # DRY
+        def command_parser(self, command):
+            self.log.debug("command: {}".format(command))
+            commands = shlex.split(command)
+            self.log.debug("shlex parsed command as: " +"{{"+ "}}  {{".join(commands) +"}}")
+            return commands
+            
+
         # This is not very good at handling nested quotes - avoid using quotes in
         # the command and use wrapper scripts as much as possible
         if stdin is not None:
@@ -131,6 +139,16 @@ class SSHSpawner(Spawner):
                 flags=ssh_args,
                 hostname=self.remote_host,
                 stdin=stdin)
+
+            commands = command_parser(command)
+
+            proc = await asyncio.create_subprocess_exec(*commands,
+                                            stdin=asyncio.subprocess.PIPE, 
+                                            stdout=asyncio.subprocess.PIPE, 
+                                            stderr=asyncio.subprocess.PIPE,
+                                            env=ssh_env)
+            proc.stdin.write(stdin.encode())
+            
         else:
             command = "{ssh_command} {flags} {hostname} bash -c '{command}'".format(
                 ssh_command=self.ssh_command,
@@ -138,19 +156,12 @@ class SSHSpawner(Spawner):
                 hostname=self.remote_host,
                 command=command)
 
-        self.log.debug("command: {}".format(command))
+            commands = command_parser(command)
 
-        input_pipe = asyncio.subprocess.PIPE
-        
-
-        commands = shlex.split(command)
-        self.log.debug("shlex parsed command as: " +"{{"+ "}}  {{".join(commands) +"}}")
-
-        proc = await asyncio.create_subprocess_exec(*commands, stdin=input_pipe, 
-                                                    stdout=asyncio.subprocess.PIPE, 
-                                                    stderr=asyncio.subprocess.PIPE,
-                                                    env=ssh_env)
-        proc.stdin.write(stdin.encode())
+            proc = await asyncio.create_subprocess_exec(*commands,
+                                            stdout=asyncio.subprocess.PIPE, 
+                                            stderr=asyncio.subprocess.PIPE,
+                                            env=ssh_env)
         
         # DRY (don't repeat yourself)
         def log_process(self, returncode, stdout, stderr):
