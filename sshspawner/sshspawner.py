@@ -225,9 +225,10 @@ class SSHSpawner(Spawner):
         bash_script_str += 'echo $pid\n'
 
         run_script = "/tmp/{}_run.sh".format(self.user.name)
-        with open(run_script, "w") as f:
+        # https://www.guru99.com/reading-and-writing-files-in-python.html -- note the '+' following the w
+        with open(run_script, "w+") as f:
             f.write(bash_script_str)
-            self.log.debug("the following was written to the file '" + run_script + "':" + f.read())
+            # self.log.debug("the following was written to the file '" + run_script + "':" + f.read())
 
         stdout, stderr, retcode = await self.execute(command, stdin=run_script)
         self.log.debug("exec_notebook status={}".format(retcode))
