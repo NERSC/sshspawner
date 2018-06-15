@@ -142,7 +142,7 @@ class SSHSpawner(Spawner):
 
         # following recommendation here
         commands = shlex.split(command)
-        self.log.debug("shlex parsed command as:" +"{{"+ "}}  {{".join(commands) +"}}")
+        self.log.debug("shlex parsed command as: " +"{{"+ "}}  {{".join(commands) +"}}")
 
         # this should work I think: https://stackoverflow.com/questions/3941517/converting-list-to-args-when-calling-function
         proc = await asyncio.create_subprocess_exec(*commands, 
@@ -229,8 +229,8 @@ class SSHSpawner(Spawner):
             f.write(bash_script_str)
             # self.log.debug("the following was written to the file '" + run_script + "':" + f.read())
             # https://stackoverflow.com/a/82852/9899076
-            if not os.path.isfile(run_script):
-                raise Exception("The file " + run_script + "was not created.")
+        if not os.path.isfile(run_script):
+            raise Exception("The file " + run_script + "was not created.")
 
         stdout, stderr, retcode = await self.execute(command, stdin=run_script)
         self.log.debug("exec_notebook status={}".format(retcode))
