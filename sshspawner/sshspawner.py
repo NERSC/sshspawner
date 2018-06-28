@@ -9,73 +9,75 @@ from jupyterhub.spawner import Spawner
 
 
 class SSHSpawner(Spawner):
-    # override default from Spawner parent class since batch systems typically need longer
-    start_timeout = Integer(300).tag(config=True)
     
-    remote_host = Unicode('remote_host',
-                          help="""The SSH remote host to spawn sessions on."""
-                          ).tag(config=True)
-    remote_port = Unicode('22',
-                          help="""The SSH remote port number."""
-                          ).tag(config=True)
-    ssh_command = Unicode('ssh',
-                          help="""The SSH command."""
-                          ).tag(config=True)
+    remote_host = Unicode("remote_host",
+            help="SSH remote host to spawn sessions on",
+            config=True)
 
-    path = Unicode('/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin',
-                   help="""The default PATH (which should
-                   include the jupyter and python bin directories)
-                   """
-                   ).tag(config=True)
+    remote_port = Unicode("22",
+            help="SSH remote port number",
+            config=True)
 
+    # FIXME encourage use of full path
+    ssh_command = Unicode("ssh",
+            help="Actual SSH command",
+            config=True)
+
+    path = Unicode("/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin",
+            help="Default PATH (should include jupyter and python)",
+            config=True)
+
+    # The get_port.py script is in scripts/get_port.py
+    # FIXME See if we avoid having to deploy a script on remote side?
     remote_port_command = Unicode("/usr/local/bin/get_port.py",
-                                  help="""The command to return an unused port
-                                  on the remote node.
-                                  Copy from scripts/get_port.py to
-                                  /usr/local/bin/ on the remote node
-                                  """
-                                  ).tag(config=True)
+            help="Command to return unused port on remote host",
+            config=True)
 
-    hub_api_url = Unicode('',
-                          help="""If set, Spawner will configure the containers
-                to use the specified URL to connect the hub api.
-                This is useful when the hub_api is bound to listen
-                on all ports or is running inside of a container."""
-                          ).tag(config=True)
+    # FIXME Fix help, what happens when not set?
+    hub_api_url = Unicode("",
+            help="""If set, Spawner will configure the containers to use the
+            specified URL to connect the hub api. This is useful when the
+            hub_api is bound to listen on all ports or is running inside of a
+            container.""",
+            config=True)
 
-    ssh_keyfile = Unicode('~/.ssh/id_rsa',
-                          help="""The keyfile used to authenticate the hub with the remote host.
-                          Assumes use_gsi=False.
+    # FIXME Replace %U format with {username}
+    # FIXME Make traitlets check against GSI setting
+    ssh_keyfile = Unicode("~/.ssh/id_rsa",
+            help="""Key file used to authenticate hub with remote host. Assumes
+            use_gsi=False.
 
-                          `~` will be expanded to the user's home directory
-                          `%U` will be expanded to the user's username"""
-                          ).tag(config=True)
+            `~` will be expanded to the user's home directory
+            `%U` will be expanded to the user's username""",
+            config=True)
 
     use_gsi = Bool(False,
-                   help="""Use GSI authentication instead of SSH keys. Assumes you have a
-                   cert/key pair in /tmp/x509_{username}. Use in conjunction
-                   with GSIAuthenticator
-                   """
-                   ).tag(config=True)
+            help="""Use GSI authentication instead of SSH keys. Assumes you
+            have a cert/key pair at the right path. Use in conjunction with
+            GSIAuthenticator.""",
+            config=True)
 
-    gsi_cert_path = Unicode('/tmp/x509_%U',
-                            help="""The GSI certificate used to authenticate the hub with the
-                            remote host. (Assumes use_gsi=True)
+    # FIXME Replace %U format with {username}
+    # FIXME Make traitlets check against GSI setting
+    gsi_cert_path = Unicode("/tmp/x509_%U",
+            help="""GSI certificate used to authenticate hub with remote host.
+            Assumes use_gsi=True.
 
-                            `~` will be expanded to the user's home directory
-                            `%U` will be expanded to the user's username
-                            """
-                            ).tag(config=True)
+            `~` will be expanded to the user's home directory
+            `%U` will be expanded to the user's username""",
+            config=True)
 
-    gsi_key_path = Unicode('/tmp/x509_%U',
-                           help="""The GSI key used to authenticate the hub with the
-                           remote host. (Assumes use_gsi=True)
+    # FIXME Replace %U format with {username}
+    # FIXME Make traitlets check against GSI setting
+    gsi_key_path = Unicode("/tmp/x509_%U",
+             help="""GSI key used to authenticate hub with remote host. Assumes
+             use_gsi=True.
 
-                           `~` will be expanded to the user's home directory
-                           `%U` will be expanded to the user's username
-                           """
-                           ).tag(config=True)
+             `~` will be expanded to the user's home directory
+             `%U` will be expanded to the user's username""",
+             config=True)
 
+    # FIXME this should be a traitlet probably?
     pid = None
 
     def get_remote_user(self, username):
