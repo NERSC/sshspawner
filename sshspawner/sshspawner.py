@@ -1,8 +1,9 @@
-import os, asyncio, shlex
+
+import asyncio
+import os
+import shlex
 
 from traitlets import Bool, Unicode, Integer
-from tornado import gen
-
 
 from jupyterhub.spawner import Spawner
 
