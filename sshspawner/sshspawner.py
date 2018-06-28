@@ -114,9 +114,6 @@ class SSHSpawner(Spawner):
 
         username = self.get_remote_user(self.user.name)
 
-        if self.ssh_command is None:
-            self.ssh_command = 'ssh'
-
         ssh_args = "-o StrictHostKeyChecking=no -l {username} -p {port}".format(
             username=username, port=self.remote_port)
 
