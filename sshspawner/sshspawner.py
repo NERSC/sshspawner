@@ -2,6 +2,7 @@
 import asyncio
 import os
 import shlex
+import warnings
 
 from traitlets import Bool, Unicode, Integer
 
@@ -45,23 +46,24 @@ class SSHSpawner(Spawner):
     # FIXME Make traitlets check against GSI setting
     ssh_keyfile = Unicode("~/.ssh/id_rsa",
             help="""Key file used to authenticate hub with remote host. Assumes
-            use_gsi=False.
+            use_gsi=False. (use_gsi=False is deprecated)
 
             `~` will be expanded to the user's home directory
             `%U` will be expanded to the user's username""",
             config=True)
 
+    # DEPRECATED
     use_gsi = Bool(False,
             help="""Use GSI authentication instead of SSH keys. Assumes you
             have a cert/key pair at the right path. Use in conjunction with
-            GSIAuthenticator.""",
+            GSIAuthenticator. (Deprecated)""",
             config=True)
 
     # FIXME Replace %U format with {username}
     # FIXME Make traitlets check against GSI setting
     gsi_cert_path = Unicode("/tmp/x509_%U",
             help="""GSI certificate used to authenticate hub with remote host.
-            Assumes use_gsi=True.
+            Assumes use_gsi=True. (Deprecated)
 
             `~` will be expanded to the user's home directory
             `%U` will be expanded to the user's username""",
@@ -71,7 +73,7 @@ class SSHSpawner(Spawner):
     # FIXME Make traitlets check against GSI setting
     gsi_key_path = Unicode("/tmp/x509_%U",
              help="""GSI key used to authenticate hub with remote host. Assumes
-             use_gsi=True.
+             use_gsi=True. (Deprecated)
 
              `~` will be expanded to the user's home directory
              `%U` will be expanded to the user's username""",
@@ -90,14 +92,14 @@ class SSHSpawner(Spawner):
     def get_gsi_cert(self):
         """
         Returns location of x509 user cert. Override this if you need to
-        return a different path
+        return a different path (Deprecated)
         """
         return self.gsi_cert_path.replace("%U", self.user.name)
 
     def get_gsi_key(self):
         """
         Returns location of x509 user key. Override this if you need to
-        return a different path
+        return a different path (Deprecated)
         """
         return self.gsi_key_path.replace("%U", self.user.name)
 
@@ -119,6 +121,8 @@ class SSHSpawner(Spawner):
             username=username, port=self.remote_port)
 
         if self.use_gsi:
+            warnings.warn("SSHSpawner.use_gsi is deprecated",
+                    DeprecationWarning)
             ssh_env['X509_USER_CERT'] = self.get_gsi_cert()
             ssh_env['X509_USER_KEY']  = self.get_gsi_key()
         elif self.ssh_keyfile:
