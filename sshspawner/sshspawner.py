@@ -45,7 +45,6 @@ class SSHSpawner(Spawner):
             container."""),
             config=True)
 
-    # FIXME Make traitlets check against GSI setting
     ssh_keyfile = Unicode("~/.ssh/id_rsa",
             help=dedent("""Key file used to authenticate hub with remote host.
             Assumes use_gsi=False. (use_gsi=False is deprecated)
@@ -61,7 +60,6 @@ class SSHSpawner(Spawner):
             GSIAuthenticator. (Deprecated)""",
             config=True)
 
-    # FIXME Make traitlets check against GSI setting
     gsi_cert_path = Unicode("/tmp/x509_{username}",
             help=dedent("""GSI certificate used to authenticate hub with remote
             host.  Assumes use_gsi=True. (Deprecated)
@@ -70,7 +68,6 @@ class SSHSpawner(Spawner):
             will be expanded to the user's username"""),
             config=True)
 
-    # FIXME Make traitlets check against GSI setting
     gsi_key_path = Unicode("/tmp/x509_{username}",
              help=dedent("""GSI key used to authenticate hub with remote host.
              Assumes use_gsi=True. (Deprecated)
