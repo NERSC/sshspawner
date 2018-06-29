@@ -1,7 +1,7 @@
-
 import asyncio
 import os
 import shlex
+from textwrap import dedent
 import warnings
 
 from traitlets import Bool, Unicode, Integer
@@ -35,20 +35,20 @@ class SSHSpawner(Spawner):
 
     # FIXME Fix help, what happens when not set?
     hub_api_url = Unicode("",
-            help="""If set, Spawner will configure the containers to use the
-            specified URL to connect the hub api. This is useful when the
+            help=dedent("""If set, Spawner will configure the containers to use
+            the specified URL to connect the hub api. This is useful when the
             hub_api is bound to listen on all ports or is running inside of a
-            container.""",
+            container."""),
             config=True)
 
     # FIXME Replace %U format with {username}
     # FIXME Make traitlets check against GSI setting
     ssh_keyfile = Unicode("~/.ssh/id_rsa",
-            help="""Key file used to authenticate hub with remote host. Assumes
-            use_gsi=False. (use_gsi=False is deprecated)
+            help=dedent("""Key file used to authenticate hub with remote host.
+            Assumes use_gsi=False. (use_gsi=False is deprecated)
 
-            `~` will be expanded to the user's home directory
-            `%U` will be expanded to the user's username""",
+            `~` will be expanded to the user's home directory `%U` will be
+            expanded to the user's username"""),
             config=True)
 
     # DEPRECATED
@@ -61,21 +61,21 @@ class SSHSpawner(Spawner):
     # FIXME Replace %U format with {username}
     # FIXME Make traitlets check against GSI setting
     gsi_cert_path = Unicode("/tmp/x509_%U",
-            help="""GSI certificate used to authenticate hub with remote host.
-            Assumes use_gsi=True. (Deprecated)
+            help=dedent("""GSI certificate used to authenticate hub with remote
+            host.  Assumes use_gsi=True. (Deprecated)
 
             `~` will be expanded to the user's home directory
-            `%U` will be expanded to the user's username""",
+            `%U` will be expanded to the user's username"""),
             config=True)
 
     # FIXME Replace %U format with {username}
     # FIXME Make traitlets check against GSI setting
     gsi_key_path = Unicode("/tmp/x509_%U",
-             help="""GSI key used to authenticate hub with remote host. Assumes
-             use_gsi=True. (Deprecated)
+             help=dedent("""GSI key used to authenticate hub with remote host.
+             Assumes use_gsi=True. (Deprecated)
 
              `~` will be expanded to the user's home directory
-             `%U` will be expanded to the user's username""",
+             `%U` will be expanded to the user's username"""),
              config=True)
 
     # FIXME this should be a traitlet probably?
