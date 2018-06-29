@@ -191,14 +191,8 @@ class SSHSpawner(Spawner):
         else:
             return None
 
-    # FIXME handle the now business like the documentation actually says
     async def stop(self, now=False):
-        """Stop single-user server process for the current user.
-
-        If `now` is False (default), shutdown the server as gracefully as possible,
-        e.g. starting with SIGINT, then SIGTERM, then SIGKILL.
-        If `now` is True, terminate the server immediately.
-        The coroutine should return when the process is no longer running."""
+        """Stop single-user server process for the current user."""
         alive = await self.remote_signal(15)
         self.clear_state()
 
