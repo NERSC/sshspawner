@@ -19,8 +19,7 @@ class SSHSpawner(Spawner):
             help="SSH remote port number",
             config=True)
 
-    # FIXME encourage use of full path
-    ssh_command = Unicode("ssh",
+    ssh_command = Unicode("/usr/bin/ssh",
             help="Actual SSH command",
             config=True)
 
