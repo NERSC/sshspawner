@@ -76,8 +76,9 @@ class SSHSpawner(Spawner):
              will be expanded to the user's username"""),
              config=True)
 
-    # FIXME this should be a traitlet probably?
-    pid = None
+    pid = Integer(0,
+            help=dedent("""Process ID of single-user server process spawned for
+            current user."""))
 
     # TODO When we add host pool, we need to keep host/ip too, not just PID.
     def load_state(self, state):
