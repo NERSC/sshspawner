@@ -45,14 +45,13 @@ class SSHSpawner(Spawner):
             container."""),
             config=True)
 
-    # FIXME Replace %U format with {username}
     # FIXME Make traitlets check against GSI setting
     ssh_keyfile = Unicode("~/.ssh/id_rsa",
             help=dedent("""Key file used to authenticate hub with remote host.
             Assumes use_gsi=False. (use_gsi=False is deprecated)
 
-            `~` will be expanded to the user's home directory `%U` will be
-            expanded to the user's username"""),
+            `~` will be expanded to the user's home directory and `{username}`
+            will be expanded to the user's username"""),
             config=True)
 
     # DEPRECATED
@@ -62,24 +61,22 @@ class SSHSpawner(Spawner):
             GSIAuthenticator. (Deprecated)""",
             config=True)
 
-    # FIXME Replace %U format with {username}
     # FIXME Make traitlets check against GSI setting
-    gsi_cert_path = Unicode("/tmp/x509_%U",
+    gsi_cert_path = Unicode("/tmp/x509_{username}",
             help=dedent("""GSI certificate used to authenticate hub with remote
             host.  Assumes use_gsi=True. (Deprecated)
 
-            `~` will be expanded to the user's home directory
-            `%U` will be expanded to the user's username"""),
+            `~` will be expanded to the user's home directory and `{username}`
+            will be expanded to the user's username"""),
             config=True)
 
-    # FIXME Replace %U format with {username}
     # FIXME Make traitlets check against GSI setting
-    gsi_key_path = Unicode("/tmp/x509_%U",
+    gsi_key_path = Unicode("/tmp/x509_{username}",
              help=dedent("""GSI key used to authenticate hub with remote host.
              Assumes use_gsi=True. (Deprecated)
 
-             `~` will be expanded to the user's home directory
-             `%U` will be expanded to the user's username"""),
+             `~` will be expanded to the user's home directory and `{username}`
+             will be expanded to the user's username"""),
              config=True)
 
     # FIXME this should be a traitlet probably?
@@ -213,11 +210,11 @@ class SSHSpawner(Spawner):
 
     def get_gsi_cert(self):
         """Get location of x509 user cert. (Deprecated)"""
-        return self.gsi_cert_path.replace("%U", self.user.name)
+        return self.gsi_cert_path.format(username=self.user.name)
 
     def get_gsi_key(self):
         """Get location of x509 user key. (Deprecated)"""
-        return self.gsi_key_path.replace("%U", self.user.name)
+        return self.gsi_key_path.format(username=self.user.name)
 
     async def remote_random_port(self):
         """Select unoccupied port on the remote host and return it. 
@@ -321,7 +318,7 @@ class SSHSpawner(Spawner):
             ssh_env['X509_USER_KEY']  = self.get_gsi_key()
         elif self.ssh_keyfile:
             ssh_args += " -i {keyfile}".format(
-                    keyfile=self.ssh_keyfile.replace("%U", self.user.name))
+                    keyfile=self.ssh_keyfile.format(username=self.user.name))
             ssh_args += " -o preferredauthentications=publickey"
 
         # DRY (don't repeat yourself)
