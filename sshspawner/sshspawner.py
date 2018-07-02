@@ -10,22 +10,21 @@ from jupyterhub.spawner import Spawner
 
 
 class SSHSpawner(Spawner):
+
+    # http://traitlets.readthedocs.io/en/stable/migration.html#separation-of-metadata-and-keyword-arguments-in-traittype-contructors
+    # config is an unrecognized keyword
     
     remote_host = Unicode("remote_host",
-            help="SSH remote host to spawn sessions on",
-            config=True)
+            help="SSH remote host to spawn sessions on").tag(config=True)
 
     remote_port = Unicode("22",
-            help="SSH remote port number",
-            config=True)
+            help="SSH remote port number").tag(config=True)
 
     ssh_command = Unicode("/usr/bin/ssh",
-            help="Actual SSH command",
-            config=True)
+            help="Actual SSH command").tag(config=True)
 
     path = Unicode("/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin",
-            help="Default PATH (should include jupyter and python)",
-            config=True)
+            help="Default PATH (should include jupyter and python)").tag(config=True)
 
     # The get_port.py script is in scripts/get_port.py
     # FIXME See if we avoid having to deploy a script on remote side?
@@ -34,47 +33,41 @@ class SSHSpawner(Spawner):
     # If we were fancy it could be configurable so it could be restricted
     # to specific ports.
     remote_port_command = Unicode("/usr/local/bin/get_port.py",
-            help="Command to return unused port on remote host",
-            config=True)
+            help="Command to return unused port on remote host").tag(config=True)
 
     # FIXME Fix help, what happens when not set?
     hub_api_url = Unicode("",
             help=dedent("""If set, Spawner will configure the containers to use
             the specified URL to connect the hub api. This is useful when the
             hub_api is bound to listen on all ports or is running inside of a
-            container."""),
-            config=True)
+            container.""")).tag(config=True)
 
     ssh_keyfile = Unicode("~/.ssh/id_rsa",
             help=dedent("""Key file used to authenticate hub with remote host.
             Assumes use_gsi=False. (use_gsi=False is deprecated)
 
             `~` will be expanded to the user's home directory and `{username}`
-            will be expanded to the user's username"""),
-            config=True)
+            will be expanded to the user's username""")).tag(config=True)
 
     # DEPRECATED
     use_gsi = Bool(False,
             help="""Use GSI authentication instead of SSH keys. Assumes you
             have a cert/key pair at the right path. Use in conjunction with
-            GSIAuthenticator. (Deprecated)""",
-            config=True)
+            GSIAuthenticator. (Deprecated)""").tag(config=True)
 
     gsi_cert_path = Unicode("/tmp/x509_{username}",
             help=dedent("""GSI certificate used to authenticate hub with remote
             host.  Assumes use_gsi=True. (Deprecated)
 
             `~` will be expanded to the user's home directory and `{username}`
-            will be expanded to the user's username"""),
-            config=True)
+            will be expanded to the user's username""")).tag(config=True)
 
     gsi_key_path = Unicode("/tmp/x509_{username}",
              help=dedent("""GSI key used to authenticate hub with remote host.
              Assumes use_gsi=True. (Deprecated)
 
              `~` will be expanded to the user's home directory and `{username}`
-             will be expanded to the user's username"""),
-             config=True)
+             will be expanded to the user's username""")).tag(config=True)
 
     pid = Integer(0,
             help=dedent("""Process ID of single-user server process spawned for
@@ -330,7 +323,7 @@ class SSHSpawner(Spawner):
             commands = split_into_arguments(self, command)
             # the variable stdin above is the path to a shell script, but what the process requires as stdin is the content of the file itself as a buffer/bytes
             stdin = open(stdin, "rb")
-            # it ^ might be better if this were an asyncio.streamwriter or asyncio.subprocess.PIPE, but this still works -- consider it a proof of concept.
+            # ^ might be better if this were an asyncio.streamwriter or asyncio.subprocess.PIPE. This might be (slightly) blocking.
 
                         
         else:
