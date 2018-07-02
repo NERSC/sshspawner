@@ -332,11 +332,6 @@ class SSHSpawner(Spawner):
             stdin = open(stdin, "rb")
             # it ^ might be better if this were an asyncio.streamwriter or asyncio.subprocess.PIPE, but this still works -- consider it a proof of concept.
 
-            proc = await asyncio.create_subprocess_exec(*commands,
-                                            stdin=stdin, 
-                                            stdout=asyncio.subprocess.PIPE, 
-                                            stderr=asyncio.subprocess.PIPE,
-                                            env=ssh_env)
                         
         else:
             command = "{ssh_command} {flags} {hostname} bash -c '{command}'".format(
@@ -347,10 +342,12 @@ class SSHSpawner(Spawner):
 
             commands = split_into_arguments(self, command)
 
-            proc = await asyncio.create_subprocess_exec(*commands,
-                                            stdout=asyncio.subprocess.PIPE, 
-                                            stderr=asyncio.subprocess.PIPE,
-                                            env=ssh_env)
+        proc = await asyncio.create_subprocess_exec(*commands,
+                                                        stdin=stdin, 
+                                                        stdout=asyncio.subprocess.PIPE, 
+                                                        stderr=asyncio.subprocess.PIPE,
+                                                        env=ssh_env)
+
         
         # DRY
         def log_process(self, returncode, stdout, stderr):
