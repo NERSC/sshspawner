@@ -3,8 +3,9 @@ import os
 import shlex
 from textwrap import dedent
 import warnings
+import random
 
-from traitlets import Bool, Unicode, Integer
+from traitlets import Bool, Unicode, Integer, List
 
 from jupyterhub.spawner import Spawner
 
@@ -13,9 +14,15 @@ class SSHSpawner(Spawner):
 
     # http://traitlets.readthedocs.io/en/stable/migration.html#separation-of-metadata-and-keyword-arguments-in-traittype-contructors
     # config is an unrecognized keyword
-    
+
+    nodes = List(trait=Unicode(), default_value=['Cori19','Cori20'],
+            help="Possible remote hosts from which to choose remote_host.").tag(config=True)
+
+    # Removed 'config=True' tag.
+    # Any user configureation of remote_host is redundant.
+    # The spawner now chooses the value of remote_host.
     remote_host = Unicode("remote_host",
-            help="SSH remote host to spawn sessions on").tag(config=True)
+            help="SSH remote host to spawn sessions on")
 
     remote_port = Unicode("22",
             help="SSH remote port number").tag(config=True)
@@ -131,6 +138,8 @@ class SSHSpawner(Spawner):
     async def start(self):
         """Start single-user server on remote host."""
 
+        self.remote_host = self.choose_remote_host()
+        
         port = await self.remote_random_port()
         if port is None or port == 0:
             return False
@@ -192,6 +201,17 @@ class SSHSpawner(Spawner):
     def get_remote_user(self, username):
         """Map JupyterHub username to remote username."""
         return username
+
+    def choose_remote_host(self):
+        """
+        Given the list of possible nodes from which to choose, make the choice of which should be the remote host.
+        """
+        remote_host = random.choice(self.nodes)
+        return remote_host
+
+    @observe('remote_host')
+    def _log_remote_host(self, change):
+        self.log.debug("Remote host was set to %s." % self.remote_host)
 
     def get_gsi_cert(self):
         """Get location of x509 user cert. (Deprecated)"""
