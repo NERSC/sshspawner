@@ -5,7 +5,7 @@ from textwrap import dedent
 import warnings
 import random
 
-from traitlets import Bool, Unicode, Integer, List
+from traitlets import Bool, Unicode, Integer, List, observe
 
 from jupyterhub.spawner import Spawner
 
