@@ -3,17 +3,27 @@ import os
 import shlex
 from textwrap import dedent
 import warnings
+import random
 
-from traitlets import Bool, Unicode, Integer
+from traitlets import Bool, Unicode, Integer, List, observe
 
 from jupyterhub.spawner import Spawner
 
 
 class SSHSpawner(Spawner):
-    
-    remote_host = Unicode("remote_host",
-            help="SSH remote host to spawn sessions on",
+
+    # http://traitlets.readthedocs.io/en/stable/migration.html#separation-of-metadata-and-keyword-arguments-in-traittype-contructors
+    # config is an unrecognized keyword
+
+    remote_hosts = List(trait=Unicode(),
+            help="Possible remote hosts from which to choose remote_host.",
             config=True)
+
+    # Removed 'config=True' tag.
+    # Any user configureation of remote_host is redundant.
+    # The spawner now chooses the value of remote_host.
+    remote_host = Unicode("remote_host",
+            help="SSH remote host to spawn sessions on")
 
     remote_port = Unicode("22",
             help="SSH remote port number",
@@ -74,7 +84,7 @@ class SSHSpawner(Spawner):
 
              `~` will be expanded to the user's home directory and `{username}`
              will be expanded to the user's username"""),
-             config=True)
+            config=True)
 
     pid = Integer(0,
             help=dedent("""Process ID of single-user server process spawned for
@@ -138,6 +148,8 @@ class SSHSpawner(Spawner):
     async def start(self):
         """Start single-user server on remote host."""
 
+        self.remote_host = self.choose_remote_host()
+        
         port = await self.remote_random_port()
         if port is None or port == 0:
             return False
@@ -199,6 +211,17 @@ class SSHSpawner(Spawner):
     def get_remote_user(self, username):
         """Map JupyterHub username to remote username."""
         return username
+
+    def choose_remote_host(self):
+        """
+        Given the list of possible nodes from which to choose, make the choice of which should be the remote host.
+        """
+        remote_host = random.choice(self.remote_hosts)
+        return remote_host
+
+    @observe('remote_host')
+    def _log_remote_host(self, change):
+        self.log.debug("Remote host was set to %s." % self.remote_host)
 
     def get_gsi_cert(self):
         """Get location of x509 user cert. (Deprecated)"""
@@ -330,13 +353,8 @@ class SSHSpawner(Spawner):
             commands = split_into_arguments(self, command)
             # the variable stdin above is the path to a shell script, but what the process requires as stdin is the content of the file itself as a buffer/bytes
             stdin = open(stdin, "rb")
-            # it ^ might be better if this were an asyncio.streamwriter or asyncio.subprocess.PIPE, but this still works -- consider it a proof of concept.
+            # ^ might be better if this were an asyncio.streamwriter or asyncio.subprocess.PIPE. This might be (slightly) blocking.
 
-            proc = await asyncio.create_subprocess_exec(*commands,
-                                            stdin=stdin, 
-                                            stdout=asyncio.subprocess.PIPE, 
-                                            stderr=asyncio.subprocess.PIPE,
-                                            env=ssh_env)
                         
         else:
             command = "{ssh_command} {flags} {hostname} bash -c '{command}'".format(
@@ -347,10 +365,12 @@ class SSHSpawner(Spawner):
 
             commands = split_into_arguments(self, command)
 
-            proc = await asyncio.create_subprocess_exec(*commands,
-                                            stdout=asyncio.subprocess.PIPE, 
-                                            stderr=asyncio.subprocess.PIPE,
-                                            env=ssh_env)
+        proc = await asyncio.create_subprocess_exec(*commands,
+                                                        stdin=stdin, 
+                                                        stdout=asyncio.subprocess.PIPE, 
+                                                        stderr=asyncio.subprocess.PIPE,
+                                                        env=ssh_env)
+
         
         # DRY
         def log_process(self, returncode, stdout, stderr):
