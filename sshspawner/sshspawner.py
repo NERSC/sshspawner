@@ -15,8 +15,9 @@ class SSHSpawner(Spawner):
     # http://traitlets.readthedocs.io/en/stable/migration.html#separation-of-metadata-and-keyword-arguments-in-traittype-contructors
     # config is an unrecognized keyword
 
-    nodes = List(trait=Unicode(), default_value=['Cori19','Cori20'],
-            help="Possible remote hosts from which to choose remote_host.").tag(config=True)
+    remote_hosts = List(trait=Unicode(),
+            help="Possible remote hosts from which to choose remote_host.",
+            config=True)
 
     # Removed 'config=True' tag.
     # Any user configureation of remote_host is redundant.
@@ -25,13 +26,16 @@ class SSHSpawner(Spawner):
             help="SSH remote host to spawn sessions on")
 
     remote_port = Unicode("22",
-            help="SSH remote port number").tag(config=True)
+            help="SSH remote port number",
+            config=True)
 
     ssh_command = Unicode("/usr/bin/ssh",
-            help="Actual SSH command").tag(config=True)
+            help="Actual SSH command",
+            config=True)
 
     path = Unicode("/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin",
-            help="Default PATH (should include jupyter and python)").tag(config=True)
+            help="Default PATH (should include jupyter and python)",
+            config=True)
 
     # The get_port.py script is in scripts/get_port.py
     # FIXME See if we avoid having to deploy a script on remote side?
@@ -40,41 +44,47 @@ class SSHSpawner(Spawner):
     # If we were fancy it could be configurable so it could be restricted
     # to specific ports.
     remote_port_command = Unicode("/usr/local/bin/get_port.py",
-            help="Command to return unused port on remote host").tag(config=True)
+            help="Command to return unused port on remote host",
+            config=True)
 
     # FIXME Fix help, what happens when not set?
     hub_api_url = Unicode("",
             help=dedent("""If set, Spawner will configure the containers to use
             the specified URL to connect the hub api. This is useful when the
             hub_api is bound to listen on all ports or is running inside of a
-            container.""")).tag(config=True)
+            container."""),
+            config=True)
 
     ssh_keyfile = Unicode("~/.ssh/id_rsa",
             help=dedent("""Key file used to authenticate hub with remote host.
             Assumes use_gsi=False. (use_gsi=False is deprecated)
 
             `~` will be expanded to the user's home directory and `{username}`
-            will be expanded to the user's username""")).tag(config=True)
+            will be expanded to the user's username"""),
+            config=True)
 
     # DEPRECATED
     use_gsi = Bool(False,
             help="""Use GSI authentication instead of SSH keys. Assumes you
             have a cert/key pair at the right path. Use in conjunction with
-            GSIAuthenticator. (Deprecated)""").tag(config=True)
+            GSIAuthenticator. (Deprecated)""",
+            config=True)
 
     gsi_cert_path = Unicode("/tmp/x509_{username}",
             help=dedent("""GSI certificate used to authenticate hub with remote
             host.  Assumes use_gsi=True. (Deprecated)
 
             `~` will be expanded to the user's home directory and `{username}`
-            will be expanded to the user's username""")).tag(config=True)
+            will be expanded to the user's username"""),
+            config=True)
 
     gsi_key_path = Unicode("/tmp/x509_{username}",
              help=dedent("""GSI key used to authenticate hub with remote host.
              Assumes use_gsi=True. (Deprecated)
 
              `~` will be expanded to the user's home directory and `{username}`
-             will be expanded to the user's username""")).tag(config=True)
+             will be expanded to the user's username"""),
+            config=True)
 
     pid = Integer(0,
             help=dedent("""Process ID of single-user server process spawned for
@@ -202,11 +212,11 @@ class SSHSpawner(Spawner):
         """Map JupyterHub username to remote username."""
         return username
 
-    def choose_remote_host(self):
+    async def choose_remote_host(self):
         """
         Given the list of possible nodes from which to choose, make the choice of which should be the remote host.
         """
-        remote_host = random.choice(self.nodes)
+        remote_host = random.choice(self.remote_hosts)
         return remote_host
 
     @observe('remote_host')
