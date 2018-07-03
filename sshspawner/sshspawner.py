@@ -212,11 +212,11 @@ class SSHSpawner(Spawner):
         """Map JupyterHub username to remote username."""
         return username
 
-    async def choose_remote_host(self):
+    def choose_remote_host(self):
         """
         Given the list of possible nodes from which to choose, make the choice of which should be the remote host.
         """
-        remote_host = await random.choice(self.remote_hosts)
+        remote_host = random.choice(self.remote_hosts)
         return remote_host
 
     @observe('remote_host')
