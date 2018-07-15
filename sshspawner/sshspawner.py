@@ -264,6 +264,7 @@ class SSHSpawner(Spawner):
             # item is a (key, value) tuple
             # command = ('export %s=%s;' % item) + command
             bash_script_str += 'export %s=%s\n' % item
+        bash_script_str += 'unset XDG_RUNTIME_DIR\n'
 
         # FIXME this keeps getting repeated
         # pass this into bash -c 'command'
