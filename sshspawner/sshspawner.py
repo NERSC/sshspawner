@@ -248,6 +248,7 @@ class SSHSpawner(Spawner):
         if stdout != b"":
             # ASCII art fix: turn bytes to string, strip whitespace, split along newlines, grab last line of STDOUT.
             # Assumption: The last line of STDOUT should always be output of get_port.py, ASCII art or not.
+            # Assumption: The last line of the STDOUT created by get_port.py is always the port number.
             port = int(stdout.decode().strip().split("\n")[-1])
             self.log.debug("port={}".format(port))
         else:
