@@ -1,4 +1,3 @@
-#!/usr/bin/python
 
 # Gets a random unused port
 

@@ -43,7 +43,7 @@ class SSHSpawner(Spawner):
     # as a package and have it put get_port.py in the right place.
     # If we were fancy it could be configurable so it could be restricted
     # to specific ports.
-    remote_port_command = Unicode("/usr/local/bin/get_port.py",
+    remote_port_command = Unicode("/usr/bin/python /usr/local/bin/get_port.py",
             help="Command to return unused port on remote host",
             config=True)
 
