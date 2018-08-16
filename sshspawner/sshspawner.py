@@ -115,20 +115,11 @@ class SSHSpawner(Spawner):
         super().clear_state()
         self.pid = 0
 
-    # FIXME this looks like it's done differently now, there is get_env which
-    # actually calls this.
-    def user_env(self):
+    def get_env(self):
         """Augment env of spawned process with user-specific env variables."""
-
-        # FIXME I think the JPY_ variables have been deprecated in JupyterHub
-        # since 0.7.2, we should replace them.  Can we figure this out?
 
         env = super(SSHSpawner, self).get_env()
         env.update(dict(
-            JPY_USER=self.user.name,
-            JPY_COOKIE_NAME=self.user.server.cookie_name,
-            JPY_BASE_URL=self.user.server.base_url,
-            JPY_HUB_PREFIX=self.hub.server.base_url,
             JUPYTERHUB_PREFIX=self.hub.server.base_url,
             PATH=self.path
         ))
@@ -140,7 +131,6 @@ class SSHSpawner(Spawner):
         if self.hub_api_url != '':
             hub_api_url = self.hub_api_url
 
-        env['JPY_HUB_API_URL'] = hub_api_url
         env['JUPYTERHUB_API_URL'] = hub_api_url
 
         return env
@@ -260,7 +250,7 @@ class SSHSpawner(Spawner):
     async def exec_notebook(self, command):
         """TBD"""
 
-        env = self.user_env()
+        env = self.get_env()
         bash_script_str = "#!/bin/bash\n"
 
         for item in env.items():
