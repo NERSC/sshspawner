@@ -2,7 +2,7 @@
 c.JupyterHub.spawner_class = 'sshspawner.sshspawner.SSHSpawner'
 
 # The remote host to spawn notebooks on
-c.SSHSpawner.remote_host = 'cori19-224.nersc.gov'
+c.SSHSpawner.remote_hosts = ['cori19-224.nersc.gov']
 c.SSHSpawner.remote_port = '2222'
 c.SSHSpawner.ssh_command = 'gsissh'
 
