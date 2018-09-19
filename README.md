@@ -6,9 +6,6 @@ The *sshspawner* enables JupyterHub to spawn single-user notebook servers on rem
 ## Features
 
 * Supports SSH key-based authentication
-* Also supports GSISSH
-    * This also requires use of [GSIAuthenticator](https://github.com/NERSC/GSIAuthenticator)
-    * **NOTE** GSISSH authentication is *deprecated* and will be removed in a future release
 * Pool of remote hosts for spawning notebook servers
 * Extensible custom load-balacing for remote host pool
 * Remote-side scripting to return IP and port
@@ -17,7 +14,6 @@ The *sshspawner* enables JupyterHub to spawn single-user notebook servers on rem
 
 * Python 3
 * JupyterHub
-* Optional: [GSIAuthenticator](https://github.com/NERSC/GSIAuthenticator) for GSISSH support (*deprecated*)
 
 ## Installation
 

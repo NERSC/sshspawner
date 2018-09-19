@@ -57,33 +57,9 @@ class SSHSpawner(Spawner):
 
     ssh_keyfile = Unicode("~/.ssh/id_rsa",
             help=dedent("""Key file used to authenticate hub with remote host.
-            Assumes use_gsi=False. (use_gsi=False is deprecated)
 
             `~` will be expanded to the user's home directory and `{username}`
             will be expanded to the user's username"""),
-            config=True)
-
-    # DEPRECATED
-    use_gsi = Bool(False,
-            help="""Use GSI authentication instead of SSH keys. Assumes you
-            have a cert/key pair at the right path. Use in conjunction with
-            GSIAuthenticator. (Deprecated)""",
-            config=True)
-
-    gsi_cert_path = Unicode("/tmp/x509_{username}",
-            help=dedent("""GSI certificate used to authenticate hub with remote
-            host.  Assumes use_gsi=True. (Deprecated)
-
-            `~` will be expanded to the user's home directory and `{username}`
-            will be expanded to the user's username"""),
-            config=True)
-
-    gsi_key_path = Unicode("/tmp/x509_{username}",
-             help=dedent("""GSI key used to authenticate hub with remote host.
-             Assumes use_gsi=True. (Deprecated)
-
-             `~` will be expanded to the user's home directory and `{username}`
-             will be expanded to the user's username"""),
             config=True)
 
     pid = Integer(0,
@@ -223,14 +199,6 @@ class SSHSpawner(Spawner):
     def _log_remote_host(self, change):
         self.log.debug("Remote host was set to %s." % self.remote_host)
 
-    def get_gsi_cert(self):
-        """Get location of x509 user cert. (Deprecated)"""
-        return self.gsi_cert_path.format(username=self.user.name)
-
-    def get_gsi_key(self):
-        """Get location of x509 user key. (Deprecated)"""
-        return self.gsi_key_path.format(username=self.user.name)
-
     async def remote_random_port(self):
         """Select unoccupied port on the remote host and return it. 
         
@@ -330,12 +298,7 @@ class SSHSpawner(Spawner):
         ssh_args = "-o StrictHostKeyChecking=no -l {username} -p {port}".format(
             username=username, port=self.remote_port)
 
-        if self.use_gsi:
-            warnings.warn("SSHSpawner.use_gsi is deprecated",
-                    DeprecationWarning)
-            ssh_env['X509_USER_CERT'] = self.get_gsi_cert()
-            ssh_env['X509_USER_KEY']  = self.get_gsi_key()
-        elif self.ssh_keyfile:
+        if self.ssh_keyfile:
             ssh_args += " -i {keyfile}".format(
                     keyfile=self.ssh_keyfile.format(username=self.user.name))
             ssh_args += " -o preferredauthentications=publickey"
