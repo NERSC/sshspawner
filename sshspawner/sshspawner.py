@@ -1,4 +1,4 @@
-import asyncio
+import asyncio, asyncssh
 import os
 import shlex
 from textwrap import dedent
@@ -269,11 +269,6 @@ class SSHSpawner(Spawner):
             bash_script_str += 'export %s=%s\n' % item
         bash_script_str += 'unset XDG_RUNTIME_DIR\n'
 
-        # FIXME this keeps getting repeated
-        # pass this into bash -c 'command'
-        # command needs to be in "" quotes, with all the redirection outside
-        # eg. bash -c '"ls -la" < /dev/null >> out.txt'
-
         # We pass in /dev/null to stdin to avoid the hang
         # Finally Grab the PID
         # command = '"%s" < /dev/null >> jupyter.log 2>&1 & pid=$!; echo $pid' % command
@@ -281,16 +276,7 @@ class SSHSpawner(Spawner):
         bash_script_str += '%s < /dev/null >> jupyter.log 2>&1 & pid=$!\n' % command
         bash_script_str += 'echo $pid\n'
 
-        run_script = "/tmp/{}_run.sh".format(self.user.name)
-        with open(run_script, "w") as f:
-            f.write(bash_script_str)
-        if not os.path.isfile(run_script):
-            raise Exception("The file " + run_script + "was not created.")
-        else:
-            with open(run_script, "r") as f:
-                self.log.debug(run_script + " was written as:\n" + f.read())
-
-        stdout, stderr, retcode = await self.execute(command, stdin=run_script)
+        stdout, stderr, retcode = await self.execute(command, stdin=bash_script_str)
         self.log.debug("exec_notebook status={}".format(retcode))
         if stdout != b'':
             pid = int(stdout)
@@ -323,58 +309,9 @@ class SSHSpawner(Spawner):
         stdin: script to pass in via stdin (via 'bash -s' < stdin)
         executes command on remote system "command" and "stdin" are mutually exclusive."""
 
-        ssh_env = os.environ.copy()
-
         username = self.get_remote_user(self.user.name)
 
-        ssh_args = "-o StrictHostKeyChecking=no -l {username} -p {port}".format(
-            username=username, port=self.remote_port)
-
-        if self.use_gsi:
-            warnings.warn("SSHSpawner.use_gsi is deprecated",
-                    DeprecationWarning)
-            ssh_env['X509_USER_CERT'] = self.get_gsi_cert()
-            ssh_env['X509_USER_KEY']  = self.get_gsi_key()
-        elif self.ssh_keyfile:
-            ssh_args += " -i {keyfile}".format(
-                    keyfile=self.ssh_keyfile.format(username=self.user.name))
-            ssh_args += " -o preferredauthentications=publickey"
-
-        # DRY (don't repeat yourself)
-        def split_into_arguments(self, command):
-            self.log.debug("command: {}".format(command))
-            commands = shlex.split(command)
-            self.log.debug("shlex parsed command as: " +"{{"+ "}}  {{".join(commands) +"}}")
-            return commands
-    
-        if stdin is not None:
-            command = "{ssh_command} {flags} {hostname} 'bash -s'".format(
-                ssh_command=self.ssh_command,
-                flags=ssh_args,
-                hostname=self.remote_host,
-                stdin=stdin)
-
-            commands = split_into_arguments(self, command)
-            # the variable stdin above is the path to a shell script, but what the process requires as stdin is the content of the file itself as a buffer/bytes
-            stdin = open(stdin, "rb")
-            # ^ might be better if this were an asyncio.streamwriter or asyncio.subprocess.PIPE. This might be (slightly) blocking.
-
-                        
-        else:
-            command = "{ssh_command} {flags} {hostname} bash -c '{command}'".format(
-                ssh_command=self.ssh_command,
-                flags=ssh_args,
-                hostname=self.remote_host,
-                command=command)
-
-            commands = split_into_arguments(self, command)
-
-        proc = await asyncio.create_subprocess_exec(*commands,
-                                                        stdin=stdin, 
-                                                        stdout=asyncio.subprocess.PIPE, 
-                                                        stderr=asyncio.subprocess.PIPE,
-                                                        env=ssh_env)
-
+        proc = await asyncssh.create_process(host="{hostname}",username=username,command=command,stdin=stdin)
         
         # DRY
         def log_process(self, returncode, stdout, stderr):
