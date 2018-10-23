@@ -1,5 +1,5 @@
 import asyncio, asyncssh
-import os
+import os,sys
 from textwrap import dedent
 import warnings
 import random
@@ -172,7 +172,7 @@ class SSHSpawner(Spawner):
 
         # time.sleep(2)
         # import pdb; pdb.set_trace()
-
+        self.log.debug("start cmd: " + remote_cmd)
         self.pid = await self.exec_notebook(remote_cmd)
 
         self.log.debug("Starting User: {}, PID: {}".format(self.user.name, self.pid))
@@ -246,9 +246,6 @@ class SSHSpawner(Spawner):
             stdout = result.stdout
             stderr = result.stderr
             retcode = result.exit_status
-            self.log.debug("STDOUT={}".format(stdout))
-            self.log.debug("STDERR={}".format(stderr))
-            self.log.debug("EXITSTATUS={}".format(retcode))
 
         if stdout != b"":
             port = int(stdout)
@@ -265,6 +262,8 @@ class SSHSpawner(Spawner):
         """TBD"""
 
         env = self.user_env()
+        username = self.get_remote_user(self.user.name)
+        k = asyncssh.read_private_key(self.ssh_keyfile.format(username=self.user.name))
         bash_script_str = "#!/bin/bash\n"
 
         for item in env.items():
@@ -272,15 +271,6 @@ class SSHSpawner(Spawner):
             # command = ('export %s=%s;' % item) + command
             bash_script_str += 'export %s=%s\n' % item
         bash_script_str += 'unset XDG_RUNTIME_DIR\n'
-
-        # FIXME this keeps getting repeated
-        # pass this into bash -c 'command'
-        # command needs to be in "" quotes, with all the redirection outside
-        # eg. bash -c '"ls -la" < /dev/null >> out.txt'
-
-        # We pass in /dev/null to stdin to avoid the hang
-        # Finally Grab the PID
-        # command = '"%s" < /dev/null >> jupyter.log 2>&1 & pid=$!; echo $pid' % command
 
         bash_script_str += '%s < /dev/null >> jupyter.log 2>&1 & pid=$!\n' % command
         bash_script_str += 'echo $pid\n'
@@ -295,6 +285,7 @@ class SSHSpawner(Spawner):
                 self.log.debug(run_script + " was written as:\n" + f.read())
 
         stdout, stderr, retcode = await self.execute(command, stdin=run_script)
+
         self.log.debug("exec_notebook status={}".format(retcode))
         if stdout != b'':
             pid = int(stdout)
@@ -306,27 +297,18 @@ class SSHSpawner(Spawner):
     async def remote_signal(self, sig):
         """Signal on the remote host."""
 
-        command = 'kill -s %s %d' % (sig, self.pid)
+        username = self.get_remote_user(self.user.name)
+        k = asyncssh.read_private_key(self.ssh_keyfile.format(username=self.user.name))
 
-        # FIXME this keeps getting repeated
-        # pass this into bash -c 'command'
-        # command needs to be in "" quotes, with all the redirection outside
-        # eg. bash -c '"ls -la" < /dev/null >> out.txt'
+        command = "kill -s %s %d < /dev/null"  % (sig, self.pid)
 
-        command = '"%s" < /dev/null' % command
-
-        stdout, stderr, retcode = await self.execute(command)
+        async with asyncssh.connect(self.remote_host,username=username,client_keys=[k],known_hosts=None) as conn:
+            result = await conn.run(command)
+            stdout = result.stdout
+            stderr = result.stderr
+            retcode = result.exit_status
         self.log.debug("command: {} returned {} --- {} --- {}".format(command, stdout, stderr, retcode))
         return (retcode == 0)
-
-    # async def execute(self, command = None, stdin = None):
-    #     username = self.get_remote_user(self.user.name)
-    #     async with asyncssh.connect(host="{hostname}",username=username) as conn:
-    #         result = await conn.run(command)
-    #         stdout = result.stdout
-    #         stderr = result.stderr
-    #         returncode = result.returncode
-    #     return (stdout, stderr, returncode)
 
     async def execute(self, command=None, stdin=None):
         """Execute remote command via ssh.
@@ -342,12 +324,7 @@ class SSHSpawner(Spawner):
         ssh_args = "-o StrictHostKeyChecking=no -l {username} -p {port}".format(
             username=username, port=self.remote_port)
 
-        if self.use_gsi:
-            warnings.warn("SSHSpawner.use_gsi is deprecated",
-                    DeprecationWarning)
-            ssh_env['X509_USER_CERT'] = self.get_gsi_cert()
-            ssh_env['X509_USER_KEY']  = self.get_gsi_key()
-        elif self.ssh_keyfile:
+        if self.ssh_keyfile:
             ssh_args += " -i {keyfile}".format(
                     keyfile=self.ssh_keyfile.format(username=self.user.name))
             ssh_args += " -o preferredauthentications=publickey"
@@ -358,28 +335,17 @@ class SSHSpawner(Spawner):
             commands = shlex.split(command)
             self.log.debug("shlex parsed command as: " +"{{"+ "}}  {{".join(commands) +"}}")
             return commands
-    
-        if stdin is not None:
-            command = "{ssh_command} {flags} {hostname} 'bash -s'".format(
-                ssh_command=self.ssh_command,
-                flags=ssh_args,
-                hostname=self.remote_host,
-                stdin=stdin)
 
-            commands = split_into_arguments(self, command)
-            # the variable stdin above is the path to a shell script, but what the process requires as stdin is the content of the file itself as a buffer/bytes
-            stdin = open(stdin, "rb")
-            # ^ might be better if this were an asyncio.streamwriter or asyncio.subprocess.PIPE. This might be (slightly) blocking.
+        command = "{ssh_command} {flags} {hostname} 'bash -s'".format(
+            ssh_command=self.ssh_command,
+            flags=ssh_args,
+            hostname=self.remote_host,
+            stdin=stdin)
 
-                        
-        else:
-            command = "{ssh_command} {flags} {hostname} bash -c '{command}'".format(
-                ssh_command=self.ssh_command,
-                flags=ssh_args,
-                hostname=self.remote_host,
-                command=command)
-
-            commands = split_into_arguments(self, command)
+        commands = split_into_arguments(self, command)
+        # the variable stdin above is the path to a shell script, but what the process requires as stdin is the content of the file itself as a buffer/bytes
+        stdin = open(stdin, "rb")
+        # ^ might be better if this were an asyncio.streamwriter or asyncio.subprocess.PIPE. This might be (slightly) blocking.
 
         proc = await asyncio.create_subprocess_exec(*commands,
                                                         stdin=stdin, 
