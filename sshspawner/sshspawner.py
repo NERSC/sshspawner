@@ -1,9 +1,9 @@
-import asyncio
+import asyncio, asyncssh
 import os
-import shlex
 from textwrap import dedent
 import warnings
 import random
+import shlex
 
 from traitlets import Bool, Unicode, Integer, List, observe
 
@@ -236,24 +236,28 @@ class SSHSpawner(Spawner):
         
         If this fails for some reason return `None`."""
 
-        # FIXME this keeps getting repeated
-        # pass this into bash -c 'command'
-        # command needs to be in "" quotes, with all the redirection outside
-        # eg. bash -c '"ls -la" < /dev/null >> out.txt'
+        username = self.get_remote_user(self.user.name)
+        k = asyncssh.read_private_key(self.ssh_keyfile.format(username=self.user.name))
 
-        command = '"{}" < /dev/null'.format(self.remote_port_command)
+        rpc = "/opt/anaconda3/bin/python -c 'import socket; s=socket.socket(); s.bind((\"\", 0)); print(s.getsockname()[1]); s.close()'"
 
-        stdout, stderr, retcode = await self.execute(command)
+        async with asyncssh.connect(self.remote_host,username=username,client_keys=[k],known_hosts=None) as conn:
+            result = await conn.run(rpc)
+            stdout = result.stdout
+            stderr = result.stderr
+            retcode = result.exit_status
+            self.log.debug("STDOUT={}".format(stdout))
+            self.log.debug("STDERR={}".format(stderr))
+            self.log.debug("EXITSTATUS={}".format(retcode))
 
         if stdout != b"":
-            # ASCII art fix: turn bytes to string, strip whitespace, split along newlines, grab last line of STDOUT.
-            # Assumption: The last line of STDOUT should always be output of get_port.py, ASCII art or not.
-            # Assumption: The last line of the STDOUT created by get_port.py is always the port number.
-            port = int(stdout.decode().strip().split("\n")[-1])
+            port = int(stdout)
             self.log.debug("port={}".format(port))
         else:
             port = None
             self.log.error("Failed to get a remote port")
+            self.log.error("STDERR={}".format(stderr))
+            self.log.debug("EXITSTATUS={}".format(retcode))
         return port
 
     # FIXME add docstring
@@ -315,7 +319,15 @@ class SSHSpawner(Spawner):
         self.log.debug("command: {} returned {} --- {} --- {}".format(command, stdout, stderr, retcode))
         return (retcode == 0)
 
-    # FIXME clean up
+    # async def execute(self, command = None, stdin = None):
+    #     username = self.get_remote_user(self.user.name)
+    #     async with asyncssh.connect(host="{hostname}",username=username) as conn:
+    #         result = await conn.run(command)
+    #         stdout = result.stdout
+    #         stderr = result.stderr
+    #         returncode = result.returncode
+    #     return (stdout, stderr, returncode)
+
     async def execute(self, command=None, stdin=None):
         """Execute remote command via ssh.
 
