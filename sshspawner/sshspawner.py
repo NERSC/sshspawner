@@ -1,5 +1,5 @@
 import asyncio, asyncssh
-import os,sys
+import os
 from textwrap import dedent
 import warnings
 import random
@@ -169,10 +169,8 @@ class SSHSpawner(Spawner):
                 cmd[index] = '--port=%d' % (port)
 
         remote_cmd = ' '.join(cmd)
+        remote_cmd = "/opt/anaconda3/bin/" + remote_cmd
 
-        # time.sleep(2)
-        # import pdb; pdb.set_trace()
-        self.log.debug("start cmd: " + remote_cmd)
         self.pid = await self.exec_notebook(remote_cmd)
 
         self.log.debug("Starting User: {}, PID: {}".format(self.user.name, self.pid))
@@ -284,7 +282,11 @@ class SSHSpawner(Spawner):
             with open(run_script, "r") as f:
                 self.log.debug(run_script + " was written as:\n" + f.read())
 
-        stdout, stderr, retcode = await self.execute(command, stdin=run_script)
+        async with asyncssh.connect(self.remote_host,username=username,client_keys=[k],known_hosts=None) as conn:
+            result = await conn.run("bash -s", stdin=run_script)
+            stdout = result.stdout
+            stderr = result.stderr
+            retcode = result.exit_status
 
         self.log.debug("exec_notebook status={}".format(retcode))
         if stdout != b'':
@@ -309,77 +311,3 @@ class SSHSpawner(Spawner):
             retcode = result.exit_status
         self.log.debug("command: {} returned {} --- {} --- {}".format(command, stdout, stderr, retcode))
         return (retcode == 0)
-
-    async def execute(self, command=None, stdin=None):
-        """Execute remote command via ssh.
-
-        command: command to execute  (via bash -c command)
-        stdin: script to pass in via stdin (via 'bash -s' < stdin)
-        executes command on remote system "command" and "stdin" are mutually exclusive."""
-
-        ssh_env = os.environ.copy()
-
-        username = self.get_remote_user(self.user.name)
-
-        ssh_args = "-o StrictHostKeyChecking=no -l {username} -p {port}".format(
-            username=username, port=self.remote_port)
-
-        if self.ssh_keyfile:
-            ssh_args += " -i {keyfile}".format(
-                    keyfile=self.ssh_keyfile.format(username=self.user.name))
-            ssh_args += " -o preferredauthentications=publickey"
-
-        # DRY (don't repeat yourself)
-        def split_into_arguments(self, command):
-            self.log.debug("command: {}".format(command))
-            commands = shlex.split(command)
-            self.log.debug("shlex parsed command as: " +"{{"+ "}}  {{".join(commands) +"}}")
-            return commands
-
-        command = "{ssh_command} {flags} {hostname} 'bash -s'".format(
-            ssh_command=self.ssh_command,
-            flags=ssh_args,
-            hostname=self.remote_host,
-            stdin=stdin)
-
-        commands = split_into_arguments(self, command)
-        # the variable stdin above is the path to a shell script, but what the process requires as stdin is the content of the file itself as a buffer/bytes
-        stdin = open(stdin, "rb")
-        # ^ might be better if this were an asyncio.streamwriter or asyncio.subprocess.PIPE. This might be (slightly) blocking.
-
-        proc = await asyncio.create_subprocess_exec(*commands,
-                                                        stdin=stdin, 
-                                                        stdout=asyncio.subprocess.PIPE, 
-                                                        stderr=asyncio.subprocess.PIPE,
-                                                        env=ssh_env)
-
-        
-        # DRY
-        def log_process(self, returncode, stdout, stderr):
-            def bytes_to_string(bytes):
-                return bytes.decode().strip()
-            stdout, stderr = (bytes_to_string(stdout), bytes_to_string(stderr))
-            self.log.debug("subprocess returned exitcode: %s" % returncode)
-            self.log.debug("subprocess returned standard output: %s" % stdout)
-            self.log.debug("subprocess returned standard error: %s" % stderr)
-
-        try:
-            stdout, stderr = await proc.communicate()
-        
-        # catch wildcard exception
-        except Exception as e:
-            self.log.debug("execute raised exception %s when trying to run command: %s" % (e, command))
-            proc.kill()
-            self.log.debug("execute failed done kill")
-            stdout, stderr = await proc.communicate()
-            self.log.debug("execute failed done communicate")
-            log_process(self, proc.returncode, stdout, stderr)
-            raise e
-        else:
-            returncode = proc.returncode
-            # account for instances where no Python exceptions, but shell process returns with non-zero exit status
-            if returncode != 0:
-                self.log.debug("execute failed for command: %s" % command)
-                log_process(self, returncode, stdout, stderr)
-                
-        return (stdout, stderr, returncode)
