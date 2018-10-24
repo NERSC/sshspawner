@@ -169,7 +169,6 @@ class SSHSpawner(Spawner):
                 cmd[index] = '--port=%d' % (port)
 
         remote_cmd = ' '.join(cmd)
-        remote_cmd = "/opt/anaconda3/bin/" + remote_cmd
 
         self.pid = await self.exec_notebook(remote_cmd)
 
