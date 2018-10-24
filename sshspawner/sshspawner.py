@@ -3,7 +3,6 @@ import os
 from textwrap import dedent
 import warnings
 import random
-import shlex
 
 from traitlets import Bool, Unicode, Integer, List, observe
 
