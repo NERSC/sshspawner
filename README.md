@@ -13,7 +13,8 @@ The *sshspawner* enables JupyterHub to spawn single-user notebook servers on rem
 ## Requirements
 
 * Python 3
-* JupyterHub
+* [JupyterHub](http://jupyter.org/install)
+* [AsyncSSH](https://asyncssh.readthedocs.io/en/latest/#installation)
 
 ## Installation
 
