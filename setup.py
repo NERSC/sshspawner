@@ -28,7 +28,7 @@ setup_args = dict(
     version=version_ns['__version__'],
     description="""SSH Spawner: A custom spawner for Jupyterhub to spawn
                    notebooks over SSH""",
-    long_description="""Spawn Jupyter notebooks on a remote node over SSH. Supports GSI and
+    long_description="""Spawn Jupyter notebooks on a remote node over SSH. Supports
                         SSH Key based authentication.""",
     author="Shreyas Cholia, Shane Canon, Rollin Thomas",
     author_email="scholia@lbl.gov, scanon@lbl.gov, rcthomas@lbl.gov",
