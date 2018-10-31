@@ -235,10 +235,8 @@ class SSHSpawner(Spawner):
         username = self.get_remote_user(self.user.name)
         k = asyncssh.read_private_key(self.ssh_keyfile.format(username=self.user.name))
 
-        rpc = "/opt/anaconda3/bin/python -c 'import socket; s=socket.socket(); s.bind((\"\", 0)); print(s.getsockname()[1]); s.close()'"
-
         async with asyncssh.connect(self.remote_host,username=username,client_keys=[k],known_hosts=None) as conn:
-            result = await conn.run(rpc)
+            result = await conn.run(self.remote_port_command)
             stdout = result.stdout
             stderr = result.stderr
             retcode = result.exit_status
