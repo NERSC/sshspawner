@@ -80,7 +80,6 @@ class SSHSpawner(Spawner):
         env = super(SSHSpawner, self).get_env()
         env.update(dict(
             JPY_USER=self.user.name,
-            JPY_COOKIE_NAME=self.user.server.cookie_name,
             JPY_BASE_URL=self.user.server.base_url,
             JPY_HUB_PREFIX=self.hub.server.base_url,
             JUPYTERHUB_PREFIX=self.hub.server.base_url,
