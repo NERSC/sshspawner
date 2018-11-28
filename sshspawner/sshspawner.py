@@ -2,7 +2,6 @@ import asyncio, asyncssh
 import os
 from textwrap import dedent
 import warnings
-import random
 
 from traitlets import Bool, Unicode, Integer, List, observe
 
@@ -14,36 +13,16 @@ class SSHSpawner(Spawner):
     # http://traitlets.readthedocs.io/en/stable/migration.html#separation-of-metadata-and-keyword-arguments-in-traittype-contructors
     # config is an unrecognized keyword
 
-    remote_hosts = List(trait=Unicode(),
-            help="Possible remote hosts from which to choose remote_host.",
-            config=True)
-
-    # Removed 'config=True' tag.
-    # Any user configureation of remote_host is redundant.
-    # The spawner now chooses the value of remote_host.
     remote_host = Unicode("remote_host",
-            help="SSH remote host to spawn sessions on")
-
-    remote_port = Unicode("22",
-            help="SSH remote port number",
+            help="SSH remote host to spawn sessions on",
             config=True)
 
-    ssh_command = Unicode("/usr/bin/ssh",
-            help="Actual SSH command",
+    remote_port = Integer(22,
+            help="SSH remote port number",
             config=True)
 
     path = Unicode("/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin",
             help="Default PATH (should include jupyter and python)",
-            config=True)
-
-    # The get_port.py script is in scripts/get_port.py
-    # FIXME See if we avoid having to deploy a script on remote side?
-    # For instance, we could just install sshspawner on the remote side
-    # as a package and have it put get_port.py in the right place.
-    # If we were fancy it could be configurable so it could be restricted
-    # to specific ports.
-    remote_port_command = Unicode("/usr/bin/python /usr/local/bin/get_port.py",
-            help="Command to return unused port on remote host",
             config=True)
 
     # FIXME Fix help, what happens when not set?
@@ -122,12 +101,8 @@ class SSHSpawner(Spawner):
 
     async def start(self):
         """Start single-user server on remote host."""
-
-        self.remote_host = self.choose_remote_host()
         
-        port = await self.remote_random_port()
-        if port is None or port == 0:
-            return False
+        port = int(self.remote_port)
         cmd = []
 
         cmd.extend(self.cmd)
@@ -184,40 +159,9 @@ class SSHSpawner(Spawner):
         """Map JupyterHub username to remote username."""
         return username
 
-    def choose_remote_host(self):
-        """
-        Given the list of possible nodes from which to choose, make the choice of which should be the remote host.
-        """
-        remote_host = random.choice(self.remote_hosts)
-        return remote_host
-
     @observe('remote_host')
     def _log_remote_host(self, change):
         self.log.debug("Remote host was set to %s." % self.remote_host)
-
-    async def remote_random_port(self):
-        """Select unoccupied port on the remote host and return it. 
-        
-        If this fails for some reason return `None`."""
-
-        username = self.get_remote_user(self.user.name)
-        k = asyncssh.read_private_key(self.ssh_keyfile.format(username=self.user.name))
-
-        async with asyncssh.connect(self.remote_host,username=username,client_keys=[k],known_hosts=None) as conn:
-            result = await conn.run(self.remote_port_command)
-            stdout = result.stdout
-            stderr = result.stderr
-            retcode = result.exit_status
-
-        if stdout != b"":
-            port = int(stdout)
-            self.log.debug("port={}".format(port))
-        else:
-            port = None
-            self.log.error("Failed to get a remote port")
-            self.log.error("STDERR={}".format(stderr))
-            self.log.debug("EXITSTATUS={}".format(retcode))
-        return port
 
     # FIXME add docstring
     async def exec_notebook(self, command):
