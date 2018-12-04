@@ -17,7 +17,8 @@ class SSHSpawner(Spawner):
             help="SSH remote host to spawn sessions on",
             config=True)
 
-    remote_port = Integer(22,
+    # refers to port selected by pre-spawn hook
+    remote_port = Integer(0,
             help="SSH remote port number",
             config=True)
 
@@ -101,6 +102,7 @@ class SSHSpawner(Spawner):
     async def start(self):
         """Start single-user server on remote host."""
         
+        # port must be selected by pre-spawn hook
         port = int(self.remote_port)
         cmd = []
 
