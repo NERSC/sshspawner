@@ -200,9 +200,12 @@ class SSHSpawner(Spawner):
         If this fails for some reason return `None`."""
 
         username = self.get_remote_user(self.user.name)
-        k = asyncssh.read_private_key(self.ssh_keyfile.format(username=self.user.name))
+        kf = self.ssh_keyfile.format(username=username)
+        cf = kf + "-cert.pub"
+        k = asyncssh.read_private_key(kf)
+        c = asyncssh.read_certificate(cf)
 
-        async with asyncssh.connect(self.remote_host,username=username,client_keys=[k],known_hosts=None) as conn:
+        async with asyncssh.connect(self.remote_host,username=username,client_keys=[(k,c)],known_hosts=None) as conn:
             result = await conn.run(self.remote_port_command)
             stdout = result.stdout
             stderr = result.stderr
@@ -224,7 +227,10 @@ class SSHSpawner(Spawner):
 
         env = self.user_env()
         username = self.get_remote_user(self.user.name)
-        k = asyncssh.read_private_key(self.ssh_keyfile.format(username=self.user.name))
+        kf = self.ssh_keyfile.format(username=username)
+        cf = kf + "-cert.pub"
+        k = asyncssh.read_private_key(kf)
+        c = asyncssh.read_certificate(cf)
         bash_script_str = "#!/bin/bash\n"
 
         for item in env.items():
@@ -245,7 +251,7 @@ class SSHSpawner(Spawner):
             with open(run_script, "r") as f:
                 self.log.debug(run_script + " was written as:\n" + f.read())
 
-        async with asyncssh.connect(self.remote_host,username=username,client_keys=[k],known_hosts=None) as conn:
+        async with asyncssh.connect(self.remote_host,username=username,client_keys=[(k,c)],known_hosts=None) as conn:
             result = await conn.run("bash -s", stdin=run_script)
             stdout = result.stdout
             stderr = result.stderr
@@ -263,11 +269,14 @@ class SSHSpawner(Spawner):
         """Signal on the remote host."""
 
         username = self.get_remote_user(self.user.name)
-        k = asyncssh.read_private_key(self.ssh_keyfile.format(username=self.user.name))
+        kf = self.ssh_keyfile.format(username=username)
+        cf = kf + "-cert.pub"
+        k = asyncssh.read_private_key(kf)
+        c = asyncssh.read_certificate(cf)
 
         command = "kill -s %s %d < /dev/null"  % (sig, self.pid)
 
-        async with asyncssh.connect(self.remote_host,username=username,client_keys=[k],known_hosts=None) as conn:
+        async with asyncssh.connect(self.remote_host,username=username,client_keys=[(k,c)],known_hosts=None) as conn:
             result = await conn.run(command)
             stdout = result.stdout
             stderr = result.stderr
