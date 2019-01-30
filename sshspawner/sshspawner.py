@@ -69,29 +69,31 @@ class SSHSpawner(Spawner):
             help=dedent("""Process ID of single-user server process spawned for
             current user."""))
 
-    # TODO When we add host pool, we need to keep host/ip too, not just PID.
     def load_state(self, state):
         """Restore state about ssh-spawned server after a hub restart.
 
-        The ssh-spawned processes only need the process id."""
+        The ssh-spawned processes need IP and the process id."""
         super().load_state(state)
         if "pid" in state:
             self.pid = state["pid"]
+        if "remote_ip" in state:
+            self.remote_ip = state["remote_ip"]
 
-    # TODO When we add host pool, we need to keep host/ip too, not just PID.
     def get_state(self):
         """Save state needed to restore this spawner instance after hub restore.
 
-        The ssh-spawned processes only need the process id."""
+        The ssh-spawned processes need IP and the process id."""
         state = super().get_state()
         if self.pid:
             state["pid"] = self.pid
+        if self.remote_ip:
+            state["remote_ip"] = self.remote_ip
         return state
 
-    # TODO When we add host pool, we need to clear host/ip too, not just PID.
     def clear_state(self):
-        """Clear stored state about this spawner (pid)"""
+        """Clear stored state about this spawner (ip, pid)"""
         super().clear_state()
+        self.remote_ip = "remote_ip"
         self.pid = 0
 
     # FIXME this looks like it's done differently now, there is get_env which
