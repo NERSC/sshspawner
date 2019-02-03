@@ -24,6 +24,10 @@ class SSHSpawner(Spawner):
     remote_host = Unicode("remote_host",
             help="SSH remote host to spawn sessions on")
 
+    # This is a external remote IP, let the server listen on all interfaces if we want
+    remote_ip = Unicode("remote_ip",
+            help="IP on remote side")
+
     remote_port = Unicode("22",
             help="SSH remote port number",
             config=True)
@@ -65,29 +69,31 @@ class SSHSpawner(Spawner):
             help=dedent("""Process ID of single-user server process spawned for
             current user."""))
 
-    # TODO When we add host pool, we need to keep host/ip too, not just PID.
     def load_state(self, state):
         """Restore state about ssh-spawned server after a hub restart.
 
-        The ssh-spawned processes only need the process id."""
+        The ssh-spawned processes need IP and the process id."""
         super().load_state(state)
         if "pid" in state:
             self.pid = state["pid"]
+        if "remote_ip" in state:
+            self.remote_ip = state["remote_ip"]
 
-    # TODO When we add host pool, we need to keep host/ip too, not just PID.
     def get_state(self):
         """Save state needed to restore this spawner instance after hub restore.
 
-        The ssh-spawned processes only need the process id."""
+        The ssh-spawned processes need IP and the process id."""
         state = super().get_state()
         if self.pid:
             state["pid"] = self.pid
+        if self.remote_ip:
+            state["remote_ip"] = self.remote_ip
         return state
 
-    # TODO When we add host pool, we need to clear host/ip too, not just PID.
     def clear_state(self):
-        """Clear stored state about this spawner (pid)"""
+        """Clear stored state about this spawner (ip, pid)"""
         super().clear_state()
+        self.remote_ip = "remote_ip"
         self.pid = 0
 
     # FIXME this looks like it's done differently now, there is get_env which
@@ -124,8 +130,8 @@ class SSHSpawner(Spawner):
 
         self.remote_host = self.choose_remote_host()
         
-        port = await self.remote_random_port()
-        if port is None or port == 0:
+        self.remote_ip, port = await self.remote_random_port()
+        if self.remote_ip is None or port is None or port == 0:
             return False
         cmd = []
 
@@ -150,8 +156,8 @@ class SSHSpawner(Spawner):
 
         if self.pid < 0:
             return None
-        # DEPRECATION: Spawner.start should return a url or (ip, port) tuple in JupyterHub >= 0.9
-        return (self.remote_host, port)
+
+        return (self.remote_ip, port)
 
     async def poll(self):
         """Poll ssh-spawned process to see if it is still running.
@@ -194,6 +200,11 @@ class SSHSpawner(Spawner):
     def _log_remote_host(self, change):
         self.log.debug("Remote host was set to %s." % self.remote_host)
 
+    @observe('remote_ip')
+    def _log_remote_ip(self, change):
+        self.log.debug("Remote IP was set to %s." % self.remote_ip)
+
+    # FIXME this needs to now return IP and port too
     async def remote_random_port(self):
         """Select unoccupied port on the remote host and return it. 
         
@@ -205,6 +216,7 @@ class SSHSpawner(Spawner):
         k = asyncssh.read_private_key(kf)
         c = asyncssh.read_certificate(cf)
 
+        # this needs to be done against remote_host, first time we're calling up
         async with asyncssh.connect(self.remote_host,username=username,client_keys=[(k,c)],known_hosts=None) as conn:
             result = await conn.run(self.remote_port_command)
             stdout = result.stdout
@@ -212,14 +224,15 @@ class SSHSpawner(Spawner):
             retcode = result.exit_status
 
         if stdout != b"":
-            port = int(stdout)
-            self.log.debug("port={}".format(port))
+            ip, port = stdout.split()
+            port = int(port)
+            self.log.debug("ip={} port={}".format(ip, port))
         else:
-            port = None
+            ip, port = None, None
             self.log.error("Failed to get a remote port")
             self.log.error("STDERR={}".format(stderr))
             self.log.debug("EXITSTATUS={}".format(retcode))
-        return port
+        return (ip, port)
 
     # FIXME add docstring
     async def exec_notebook(self, command):
@@ -251,7 +264,7 @@ class SSHSpawner(Spawner):
             with open(run_script, "r") as f:
                 self.log.debug(run_script + " was written as:\n" + f.read())
 
-        async with asyncssh.connect(self.remote_host,username=username,client_keys=[(k,c)],known_hosts=None) as conn:
+        async with asyncssh.connect(self.remote_ip, username=username,client_keys=[(k,c)],known_hosts=None) as conn:
             result = await conn.run("bash -s", stdin=run_script)
             stdout = result.stdout
             stderr = result.stderr
@@ -276,7 +289,7 @@ class SSHSpawner(Spawner):
 
         command = "kill -s %s %d < /dev/null"  % (sig, self.pid)
 
-        async with asyncssh.connect(self.remote_host,username=username,client_keys=[(k,c)],known_hosts=None) as conn:
+        async with asyncssh.connect(self.remote_ip, username=username,client_keys=[(k,c)],known_hosts=None) as conn:
             result = await conn.run(command)
             stdout = result.stdout
             stderr = result.stderr
