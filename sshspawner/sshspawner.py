@@ -106,9 +106,9 @@ class SSHSpawner(Spawner):
 
         env = super(SSHSpawner, self).get_env()
         env.update(dict(
-            JPY_USER=self.user.name,
-            JPY_BASE_URL=self.user.server.base_url,
-            JPY_HUB_PREFIX=self.hub.server.base_url,
+            # JPY_USER=self.user.name,
+            # JPY_BASE_URL=self.user.server.base_url,
+            # JPY_HUB_PREFIX=self.hub.server.base_url,
             JUPYTERHUB_PREFIX=self.hub.server.base_url,
             PATH=self.path
         ))
@@ -120,7 +120,7 @@ class SSHSpawner(Spawner):
         if self.hub_api_url != '':
             hub_api_url = self.hub_api_url
 
-        env['JPY_HUB_API_URL'] = hub_api_url
+        # env['JPY_HUB_API_URL'] = hub_api_url
         env['JUPYTERHUB_API_URL'] = hub_api_url
 
         return env
