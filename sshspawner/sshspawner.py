@@ -233,6 +233,7 @@ class SSHSpawner(Spawner):
 
         # env = self.user_env()
         env = super(SSHSpawner, self).get_env()
+        env['JUPYTERHUB_API_URL'] = self.hub_api_url
         username = self.get_remote_user(self.user.name)
         kf = self.ssh_keyfile.format(username=username)
         cf = kf + "-cert.pub"
