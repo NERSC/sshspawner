@@ -98,25 +98,25 @@ class SSHSpawner(Spawner):
 
     # FIXME this looks like it's done differently now, there is get_env which
     # actually calls this.
-    def user_env(self):
-        """Augment env of spawned process with user-specific env variables."""
+    # def user_env(self):
+    #     """Augment env of spawned process with user-specific env variables."""
 
-        env = super(SSHSpawner, self).get_env()
-        env.update(dict(
-            JUPYTERHUB_PREFIX=self.hub.server.base_url,
-            PATH=self.path
-        ))
+    #     env = super(SSHSpawner, self).get_env()
+    #     env.update(dict(
+    #         JUPYTERHUB_PREFIX=self.hub.server.base_url,
+    #         PATH=self.path
+    #     ))
 
-        if self.notebook_dir:
-            env['NOTEBOOK_DIR'] = self.notebook_dir
+    #     if self.notebook_dir:
+    #         env['NOTEBOOK_DIR'] = self.notebook_dir
 
-        hub_api_url = self.hub.api_url
-        if self.hub_api_url != '':
-            hub_api_url = self.hub_api_url
+    #     hub_api_url = self.hub.api_url
+    #     if self.hub_api_url != '':
+    #         hub_api_url = self.hub_api_url
 
-        env['JUPYTERHUB_API_URL'] = hub_api_url
+    #     env['JUPYTERHUB_API_URL'] = hub_api_url
 
-        return env
+    #     return env
 
     async def start(self):
         """Start single-user server on remote host."""
@@ -231,7 +231,8 @@ class SSHSpawner(Spawner):
     async def exec_notebook(self, command):
         """TBD"""
 
-        env = self.user_env()
+        # env = self.user_env()
+        env = super(SSHSpawner, self).get_env()
         username = self.get_remote_user(self.user.name)
         kf = self.ssh_keyfile.format(username=username)
         cf = kf + "-cert.pub"
