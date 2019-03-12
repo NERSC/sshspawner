@@ -96,35 +96,6 @@ class SSHSpawner(Spawner):
         self.remote_ip = "remote_ip"
         self.pid = 0
 
-    # FIXME this looks like it's done differently now, there is get_env which
-    # actually calls this.
-    def user_env(self):
-        """Augment env of spawned process with user-specific env variables."""
-
-        # FIXME I think the JPY_ variables have been deprecated in JupyterHub
-        # since 0.7.2, we should replace them.  Can we figure this out?
-
-        env = super(SSHSpawner, self).get_env()
-        env.update(dict(
-            JPY_USER=self.user.name,
-            JPY_BASE_URL=self.user.server.base_url,
-            JPY_HUB_PREFIX=self.hub.server.base_url,
-            JUPYTERHUB_PREFIX=self.hub.server.base_url,
-            PATH=self.path
-        ))
-
-        if self.notebook_dir:
-            env['NOTEBOOK_DIR'] = self.notebook_dir
-
-        hub_api_url = self.hub.api_url
-        if self.hub_api_url != '':
-            hub_api_url = self.hub_api_url
-
-        env['JPY_HUB_API_URL'] = hub_api_url
-        env['JUPYTERHUB_API_URL'] = hub_api_url
-
-        return env
-
     async def start(self):
         """Start single-user server on remote host."""
 
@@ -238,7 +209,8 @@ class SSHSpawner(Spawner):
     async def exec_notebook(self, command):
         """TBD"""
 
-        env = self.user_env()
+        env = super(SSHSpawner, self).get_env()
+        env['JUPYTERHUB_API_URL'] = self.hub_api_url
         username = self.get_remote_user(self.user.name)
         kf = self.ssh_keyfile.format(username=username)
         cf = kf + "-cert.pub"
