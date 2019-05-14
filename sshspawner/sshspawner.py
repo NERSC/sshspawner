@@ -225,6 +225,8 @@ class SSHSpawner(Spawner):
             bash_script_str += 'export %s=%s\n' % item
         bash_script_str += 'unset XDG_RUNTIME_DIR\n'
 
+        bash_script_str += 'touch .jupyter.log\n'
+        bash_script_str += 'chmod 600 .jupyter.log\n'
         bash_script_str += '%s < /dev/null >> .jupyter.log 2>&1 & pid=$!\n' % command
         bash_script_str += 'echo $pid\n'
 
