@@ -41,6 +41,11 @@ class SSHSpawner(Spawner):
         notebook may have a different IP from that of `remote_host`.  This 
         value is returned from the spawned server usually."""))
 
+    # TODO 
+    pid = Integer(0,
+        help=dedent("""Process ID of server spawned for the user."""))
+
+
     # TODO We should probably call everything with config'ed full absolute path
     path = Unicode("/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin",
             help="Default PATH (should include jupyter and python)",
@@ -70,10 +75,6 @@ class SSHSpawner(Spawner):
             `~` will be expanded to the user's home directory and `{username}`
             will be expanded to the user's username"""),
             config=True)
-
-    pid = Integer(0,
-            help=dedent("""Process ID of single-user server process spawned for
-            current user."""))
 
     def load_state(self, state):
         """Restore state about ssh-spawned server after a hub restart.
