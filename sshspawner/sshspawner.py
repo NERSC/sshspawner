@@ -12,23 +12,34 @@ from jupyterhub.spawner import Spawner
 class SSHSpawner(Spawner):
 
     remote_hosts = List(Unicode(),
-        help=dedent("""Remote hosts available for running notebook servers.
+        help=dedent("""Remote hosts available for spawning notebook servers.
 
         This is a list of remote hosts where notebook servers can be spawned.
         The `choose_remote_host()` method will select one of these hosts at 
         random, unless it is overridden by another algorithm that could say,
-        perform load balancing."""),
+        perform load balancing.
+
+        If this contains a single remote host value, that host will always be
+        selected (unless `choose_remote_host()` does something odd like just
+        return some other value).  That would be appropriate if there is just
+        one remote host available, or, if the remote host is itself a load 
+        balancer or is doing round-robin DNS.  That is usually a better choice
+        than trying to handle load-balancing through this spawner."""),
         config=True)
 
-    # Removed 'config=True' tag.
-    # Any user configureation of remote_host is redundant.
-    # The spawner now chooses the value of remote_host.
-    remote_host = Unicode("remote_host",
-            help="SSH remote host to spawn sessions on")
+    remote_host = Unicode("",
+        help=dedent("""Remote host selected for spawning notebook servers.
+        
+        This is selected by the `choose_remote_host()` method.  See also
+        `remote_hosts` documentation."""))
 
-    # This is a external remote IP, let the server listen on all interfaces if we want
-    remote_ip = Unicode("remote_ip",
-            help="IP on remote side")
+    # TODO Check for removal, there's already `ip`.
+    remote_ip = Unicode("",
+        help=dedent("""Remote IP of spawned notebook server.
+
+        Because the selected remote host may be a load-balancer the spawned
+        notebook may have a different IP from that of `remote_host`.  This 
+        value is returned from the spawned server usually."""))
 
     remote_port = Unicode("22",
             help="SSH remote port number",
