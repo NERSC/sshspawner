@@ -11,9 +11,14 @@ from jupyterhub.spawner import Spawner
 
 class SSHSpawner(Spawner):
 
-    remote_hosts = List(trait=Unicode(),
-            help="Possible remote hosts from which to choose remote_host.",
-            config=True)
+    remote_hosts = List(Unicode(),
+        help=dedent("""Remote hosts available for running notebook servers.
+
+        This is a list of remote hosts where notebook servers can be spawned.
+        The `choose_remote_host()` method will select one of these hosts at 
+        random, unless it is overridden by another algorithm that could say,
+        perform load balancing."""),
+        config=True)
 
     # Removed 'config=True' tag.
     # Any user configureation of remote_host is redundant.
