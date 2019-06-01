@@ -100,7 +100,7 @@ class SSHSpawner(Spawner):
     def clear_state(self):
         """Clear stored state about this spawner (ip, pid)"""
         super().clear_state()
-        self.remote_ip = "remote_ip"
+        self.remote_ip = ""
         self.pid = 0
 
     async def start(self):
