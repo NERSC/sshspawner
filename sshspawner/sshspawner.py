@@ -11,9 +11,6 @@ from jupyterhub.spawner import Spawner
 
 class SSHSpawner(Spawner):
 
-    # http://traitlets.readthedocs.io/en/stable/migration.html#separation-of-metadata-and-keyword-arguments-in-traittype-contructors
-    # config is an unrecognized keyword
-
     remote_hosts = List(trait=Unicode(),
             help="Possible remote hosts from which to choose remote_host.",
             config=True)
