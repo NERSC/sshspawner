@@ -41,6 +41,7 @@ class SSHSpawner(Spawner):
         notebook may have a different IP from that of `remote_host`.  This 
         value is returned from the spawned server usually."""))
 
+    # TODO We should probably call everything with config'ed full absolute path
     path = Unicode("/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin",
             help="Default PATH (should include jupyter and python)",
             config=True)
