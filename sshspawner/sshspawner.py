@@ -41,10 +41,6 @@ class SSHSpawner(Spawner):
         notebook may have a different IP from that of `remote_host`.  This 
         value is returned from the spawned server usually."""))
 
-    remote_port = Unicode("22",
-            help="SSH remote port number",
-            config=True)
-
     ssh_command = Unicode("/usr/bin/ssh",
             help="Actual SSH command",
             config=True)
