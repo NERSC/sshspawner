@@ -4,7 +4,7 @@ from textwrap import dedent
 import warnings
 import random
 
-from traitlets import Bool, Unicode, Integer, List, default, observe
+from traitlets import Bool, Unicode, Integer, List, default, observe, validate
 
 from jupyterhub.spawner import Spawner
 
@@ -76,11 +76,27 @@ class SSHSpawner(Spawner):
             config=True)
 
     ssh_keyfile = Unicode("~/.ssh/id_rsa",
-            help=dedent("""Key file used to authenticate hub with remote host.
+        help=dedent("""DEPRECATED: Use `private_key` and `certificate`.
+        
+        Key file used to authenticate hub with remote host.
 
-            `~` will be expanded to the user's home directory and `{username}`
-            will be expanded to the user's username"""),
-            config=True)
+        `~` will be expanded to the user's home directory and `{username}`
+        will be expanded to the user's username"""),
+        config=True)
+
+    private_key_path = Unicode("~/.ssh/id_rsa",
+        config=True)
+
+    @validate('private_key')
+    def _private_key_path(self, proposal):
+        return proposal["value"].format(username=self.user.name)
+
+    certificate_path = Unicode("~/.ssh/id_rsa-cert.pub",
+        config=True)
+
+    @validate('certificate')
+    def _certificate_path(self, proposal):
+        return proposal["value"].format(username=self.user.name)
 
     def load_state(self, state):
         """Restore state about ssh-spawned server after a hub restart.
@@ -262,31 +278,16 @@ class SSHSpawner(Spawner):
 
     async def remote_signal(self, sig):
         """Signal on the remote host."""
-
-        kf = self.ssh_keyfile.format(username=self.remote_user)
-        cf = kf + "-cert.pub"
-        k = asyncssh.read_private_key(kf)
-        c = asyncssh.read_certificate(cf)
-
         command = "kill -s %s %d < /dev/null"  % (sig, self.pid)
+        exit_status = await self.remote_execute(self.remote_ip, command)
+        return exit_status == 0
 
-        async with asyncssh.connect(self.remote_ip, username=self.remote_user,client_keys=[(k,c)],known_hosts=None) as conn:
-            result = await conn.run(command)
-            stdout = result.stdout
-            stderr = result.stderr
-            retcode = result.exit_status
-        self.log.debug("command: {} returned {} --- {} --- {}".format(command, stdout, stderr, retcode))
-        return (retcode == 0)
-
-#   async def remote_execute(self, host_or_ip):
-#       username = self.get_remote_user(self.user.name)
-#       kf = self.ssh_keyfile.format(username=username)
-#       cf = kf + "-cert.pub"
-#       k = asyncssh.read_private_key(kf)
-#       c = asyncssh.read_certificate(cf)
-#       async with asyncssh.connect(host_or_ip,
-
-
-#       async with asyncssh.connect(self.remote_host,username=username,client_keys=[(k,c)],known_hosts=None) as conn:
-#       async with asyncssh.connect(self.remote_ip, username=username,client_keys=[(k,c)],known_hosts=None) as conn:
-#       async with asyncssh.connect(self.remote_ip, username=username,client_keys=[(k,c)],known_hosts=None) as conn:
+    async def remote_execute(self, host_or_ip, command):
+        private_key = asyncssh.read_private_key(self.private_key_path)
+        certificate = asyncssh.read_certificate(self.certificate_path)
+        client_keys = [(private_key, certificate)]
+        async with asyncssh.connect(host_or_ip, username=self.remote_user,
+                client_keys=client_keys, known_hosts=None) as connection:
+            result = await connection.run(command)
+            self.log.debug(f"{command}: {result.exit_status}")
+            return result.exit_status
