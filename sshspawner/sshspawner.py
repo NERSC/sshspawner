@@ -98,6 +98,10 @@ class SSHSpawner(Spawner):
     def _certificate_path(self, proposal):
         return proposal["value"].format(username=self.user.name)
 
+    ssh_port = Integer(22,
+            help="Port for ssh connections on remote side."
+            config=True)
+
     def load_state(self, state):
         """Restore state about ssh-spawned server after a hub restart.
 
@@ -286,8 +290,9 @@ class SSHSpawner(Spawner):
         private_key = asyncssh.read_private_key(self.private_key_path)
         certificate = asyncssh.read_certificate(self.certificate_path)
         client_keys = [(private_key, certificate)]
-        async with asyncssh.connect(host_or_ip, username=self.remote_user,
-                client_keys=client_keys, known_hosts=None) as connection:
+        async with asyncssh.connect(host_or_ip, self.ssh_port,
+                username=self.remote_user, client_keys=client_keys,
+                known_hosts=None) as connection:
             result = await connection.run(command)
             self.log.debug(f"{command}: {result.exit_status}")
             return result.exit_status
