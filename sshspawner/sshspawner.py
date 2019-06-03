@@ -7,6 +7,7 @@ import random
 from traitlets import Bool, Unicode, Integer, List, default, observe, validate
 
 from jupyterhub.spawner import Spawner
+from jupyterhub.traitlets import Callable
 
 
 class SSHSpawner(Spawner):
@@ -36,6 +37,15 @@ class SSHSpawner(Spawner):
     @observe('remote_host')
     def _observe_remote_host(self, change):
         self.log.debug(f"remote_host: {self.remote_host}")
+
+    choose_remote_host = Callable(
+        help="""Choose remote host somehow.""",
+        config=True)
+
+    @default("choose_remote_host")
+    def _default_choose_remote_host(self):
+        """Just pick randomly."""
+        return random.choice(self.remote_hosts)
 
     # TODO Check for removal, there's already `ip`.
     remote_ip = Unicode("",
@@ -196,11 +206,6 @@ class SSHSpawner(Spawner):
         """Stop single-user server process for the current user."""
         alive = await self.remote_signal(15)
         self.clear_state()
-
-    def choose_remote_host(self):
-        """Given the list of possible nodes from which to choose, make the
-        choice of which should be the remote host."""
-        return random.choice(self.remote_hosts)
 
     async def remote_random_port(self):
         """Select unoccupied port on the remote host and return it. 
