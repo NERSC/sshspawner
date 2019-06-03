@@ -99,7 +99,7 @@ class SSHSpawner(Spawner):
         return proposal["value"].format(username=self.user.name)
 
     ssh_port = Integer(22,
-            help="Port for ssh connections on remote side."
+            help="Port for ssh connections on remote side.",
             config=True)
 
     def load_state(self, state):
