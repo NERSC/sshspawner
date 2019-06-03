@@ -280,9 +280,9 @@ class SSHSpawner(Spawner):
 
         return pid
 
-    async def remote_signal(self, sig):
+    async def remote_signal(self, signal):
         """Signal on the remote host."""
-        command = "kill -s %s %d < /dev/null"  % (sig, self.pid)
+        command = f"kill -s {signal} {self.pid} < /dev/null"
         exit_status = await self.remote_execute(self.remote_ip, command)
         return exit_status == 0
 
