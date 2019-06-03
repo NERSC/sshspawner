@@ -240,10 +240,6 @@ class SSHSpawner(Spawner):
         env = super(SSHSpawner, self).get_env()
         env['JUPYTERHUB_API_URL'] = self.hub_api_url
         env['PATH'] = self.path
-        kf = self.ssh_keyfile.format(username=self.remote_user)
-        cf = kf + "-cert.pub"
-        k = asyncssh.read_private_key(kf)
-        c = asyncssh.read_certificate(cf)
         bash_script_str = "#!/bin/bash\n"
 
         for item in env.items():
@@ -266,14 +262,10 @@ class SSHSpawner(Spawner):
             with open(run_script, "r") as f:
                 self.log.debug(run_script + " was written as:\n" + f.read())
 
-        async with asyncssh.connect(self.remote_ip, username=self.remote_user,client_keys=[(k,c)],known_hosts=None) as conn:
-            result = await conn.run("bash -s", stdin=run_script)
-            stdout = result.stdout
-            stderr = result.stderr
-            retcode = result.exit_status
+        result = await self.remote_execute(self.remote_ip, "bash -s",
+                stdin_run_script)
 
-        self.log.debug("exec_notebook status={}".format(retcode))
-        if stdout != b'':
+        if result.stdout != b'':
             pid = int(stdout)
         else:
             return -1
@@ -283,16 +275,19 @@ class SSHSpawner(Spawner):
     async def remote_signal(self, signal):
         """Signal on the remote host."""
         command = f"kill -s {signal} {self.pid} < /dev/null"
-        exit_status = await self.remote_execute(self.remote_ip, command)
-        return exit_status == 0
+        result = await self.remote_execute(self.remote_ip, command)
+        return result.exit_status == 0
 
-    async def remote_execute(self, host_or_ip, command):
+    async def remote_execute(self, host_or_ip, command, stdin=None):
         private_key = asyncssh.read_private_key(self.private_key_path)
         certificate = asyncssh.read_certificate(self.certificate_path)
         client_keys = [(private_key, certificate)]
         async with asyncssh.connect(host_or_ip, self.ssh_port,
                 username=self.remote_user, client_keys=client_keys,
                 known_hosts=None) as connection:
-            result = await connection.run(command)
+            if stdin is None:
+                result = await connection.run(command)
+            else:
+                result = await connection.run(command, stdin=stdin)
             self.log.debug(f"{command}: {result.exit_status}")
-            return result.exit_status
+            return result
