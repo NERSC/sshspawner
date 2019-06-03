@@ -33,6 +33,10 @@ class SSHSpawner(Spawner):
         This is selected by the `choose_remote_host()` method.  See also
         `remote_hosts` documentation."""))
 
+    @observe('remote_host')
+    def _observe_remote_host(self, change):
+        self.log.debug(f"remote_host: {self.remote_host}")
+
     # TODO Check for removal, there's already `ip`.
     remote_ip = Unicode("",
         help=dedent("""Remote IP of spawned notebook server.
@@ -40,6 +44,10 @@ class SSHSpawner(Spawner):
         Because the selected remote host may be a load-balancer the spawned
         notebook may have a different IP from that of `remote_host`.  This 
         value is returned from the spawned server usually."""))
+
+    @observe('remote_ip')
+    def _observe_remote_ip(self, change):
+        self.log.debug(f"remote_ip: {self.remote_ip}")
 
     # TODO 
     pid = Integer(0,
@@ -190,19 +198,9 @@ class SSHSpawner(Spawner):
         self.clear_state()
 
     def choose_remote_host(self):
-        """
-        Given the list of possible nodes from which to choose, make the choice of which should be the remote host.
-        """
-        remote_host = random.choice(self.remote_hosts)
-        return remote_host
-
-    @observe('remote_host')
-    def _log_remote_host(self, change):
-        self.log.debug("Remote host was set to %s." % self.remote_host)
-
-    @observe('remote_ip')
-    def _log_remote_ip(self, change):
-        self.log.debug("Remote IP was set to %s." % self.remote_ip)
+        """Given the list of possible nodes from which to choose, make the
+        choice of which should be the remote host."""
+        return random.choice(self.remote_hosts)
 
     async def remote_random_port(self):
         """Select unoccupied port on the remote host and return it. 
