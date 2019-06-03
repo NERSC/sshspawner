@@ -263,7 +263,7 @@ class SSHSpawner(Spawner):
                 self.log.debug(run_script + " was written as:\n" + f.read())
 
         result = await self.remote_execute(self.remote_ip, "bash -s",
-                stdin_run_script)
+                run_script)
 
         if result.stdout != b'':
             pid = int(stdout)
