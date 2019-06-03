@@ -266,7 +266,7 @@ class SSHSpawner(Spawner):
                 run_script)
 
         if result.stdout != b'':
-            pid = int(stdout)
+            pid = int(result.stdout)
         else:
             return -1
 
