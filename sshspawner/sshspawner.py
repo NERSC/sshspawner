@@ -42,6 +42,12 @@ class SSHSpawner(Spawner):
         help="""Choose remote host somehow.""",
         config=True)
 
+    @default("choose_remote_host")
+    def _default_choose_remote_host(self):
+        def func(obj):
+            random.choice(obj.remote_hosts)
+        return func
+
     # TODO Check for removal, there's already `ip`.
     remote_ip = Unicode("",
         help=dedent("""Remote IP of spawned notebook server.
@@ -145,10 +151,7 @@ class SSHSpawner(Spawner):
     async def start(self):
         """Start single-user server on remote host."""
 
-        if self.choose_remote_host:
-            self.remote_host = self.choose_remote_host()
-        else:
-            self.remote_host = random.choice(self.remote_hosts)
+        self.remote_host = self.choose_remote_host()
         
         self.remote_ip, port = await self.remote_random_port()
         if self.remote_ip is None or port is None or port == 0:
