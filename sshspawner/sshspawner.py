@@ -204,33 +204,20 @@ class SSHSpawner(Spawner):
     def _log_remote_ip(self, change):
         self.log.debug("Remote IP was set to %s." % self.remote_ip)
 
-    # FIXME this needs to now return IP and port too
     async def remote_random_port(self):
         """Select unoccupied port on the remote host and return it. 
         
-        If this fails for some reason return `None`."""
+        If this fails for some reason returns `(None, None)`."""
 
-        kf = self.ssh_keyfile.format(username=self.remote_user)
-        cf = kf + "-cert.pub"
-        k = asyncssh.read_private_key(kf)
-        c = asyncssh.read_certificate(cf)
+        result = await self.remote_execute(self.remote_host,
+                self.remote_port_command)
 
-        # this needs to be done against remote_host, first time we're calling up
-        async with asyncssh.connect(self.remote_host,username=self.remote_user,client_keys=[(k,c)],known_hosts=None) as conn:
-            result = await conn.run(self.remote_port_command)
-            stdout = result.stdout
-            stderr = result.stderr
-            retcode = result.exit_status
-
-        if stdout != b"":
-            ip, port = stdout.split()
+        if result.stdout != b"":
+            ip, port = result.stdout.split()
             port = int(port)
-            self.log.debug("ip={} port={}".format(ip, port))
         else:
             ip, port = None, None
-            self.log.error("Failed to get a remote port")
-            self.log.error("STDERR={}".format(stderr))
-            self.log.debug("EXITSTATUS={}".format(retcode))
+        self.log.debug(f"ip={ip} port={port}")
         return (ip, port)
 
     # FIXME add docstring
@@ -290,4 +277,5 @@ class SSHSpawner(Spawner):
             else:
                 result = await connection.run(command, stdin=stdin)
             self.log.debug(f"{command}: {result.exit_status}")
+            # should do some error reporting if any error
             return result
