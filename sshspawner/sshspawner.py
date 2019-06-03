@@ -87,14 +87,14 @@ class SSHSpawner(Spawner):
     private_key_path = Unicode("~/.ssh/id_rsa",
         config=True)
 
-    @validate('private_key')
+    @validate('private_key_path')
     def _private_key_path(self, proposal):
         return proposal["value"].format(username=self.user.name)
 
     certificate_path = Unicode("~/.ssh/id_rsa-cert.pub",
         config=True)
 
-    @validate('certificate')
+    @validate('certificate_path')
     def _certificate_path(self, proposal):
         return proposal["value"].format(username=self.user.name)
 
