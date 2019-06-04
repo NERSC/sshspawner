@@ -225,21 +225,20 @@ class SSHSpawner(Spawner):
         self.log.debug(f"ip={ip} port={port}")
         return (ip, port)
 
+    def get_env(self):
+        env = super().get_env()
+        env["PATH"] = self.path
+        return env
+
     # FIXME add docstring
     async def exec_notebook(self, command):
         """TBD"""
 
-        env = super(SSHSpawner, self).get_env()
-        env['JUPYTERHUB_API_URL'] = self.hub_api_url
-        env['PATH'] = self.path
         bash_script_str = "#!/bin/bash\n"
-
-        for item in env.items():
-            # item is a (key, value) tuple
-            # command = ('export %s=%s;' % item) + command
+        for item in self.get_env().items():
             bash_script_str += 'export %s=%s\n' % item
-        bash_script_str += 'unset XDG_RUNTIME_DIR\n'
 
+        bash_script_str += 'unset XDG_RUNTIME_DIR\n'
         bash_script_str += 'touch .jupyter.log\n'
         bash_script_str += 'chmod 600 .jupyter.log\n'
         bash_script_str += '%s < /dev/null >> .jupyter.log 2>&1 & pid=$!\n' % command
