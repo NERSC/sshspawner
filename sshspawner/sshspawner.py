@@ -42,9 +42,8 @@ class SSHSpawner(Spawner):
         help="""Choose remote host somehow.""",
         config=True)
 
-    # TODO Check for removal, there's already `ip`.
     remote_ip = Unicode("",
-        help=dedent("""Remote IP of spawned notebook server.
+        help=dedent("""Remote host IP of spawned notebook server.
 
         Because the selected remote host may be a load-balancer the spawned
         notebook may have a different IP from that of `remote_host`.  This 
