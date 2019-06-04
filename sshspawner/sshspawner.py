@@ -277,13 +277,14 @@ class SSHSpawner(Spawner):
         return when the process is no longer running.
         """
 
-        if not now:
-            status = await self.poll()
-            if status is not None:
-                return
-            self.log.debug(f"Interrupting {self.pid}")
-            await self.remote_signal(2)
-            await self.wait_for_death(10)
+#       # https://github.com/jupyterhub/jupyterhub/issues/1419, is labhub eating the SIGINT
+#       if not now:
+#           status = await self.poll()
+#           if status is not None:
+#               return
+#           self.log.debug(f"Interrupting {self.pid}")
+#           await self.remote_signal(2)
+#           await self.wait_for_death(10)
 
         # clean shutdown failed, use TERM
         status = await self.poll()
@@ -291,7 +292,7 @@ class SSHSpawner(Spawner):
             return
         self.log.debug(f"Terminating {self.pid}")
         await self.remote_signal(15)
-        await self.wait_for_death(5)
+        await self.wait_for_death(10)
 
         # TERM failed, use KILL
         status = await self.poll()
@@ -299,7 +300,7 @@ class SSHSpawner(Spawner):
             return
         self.log.debug(f"Killing {self.pid}")
         await self.remote_signal(9)
-        await self.wait_for_death(5)
+        await self.wait_for_death(10)
 
         status = await self.poll()
         if status is None:
