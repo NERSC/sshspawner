@@ -44,8 +44,8 @@ class SSHSpawner(Spawner):
 
     @default("choose_remote_host")
     def _default_choose_remote_host(self):
-        def func(obj):
-            random.choice(obj.remote_hosts)
+        def func():
+            random.choice(self.remote_hosts)
         return func
 
     # TODO Check for removal, there's already `ip`.
