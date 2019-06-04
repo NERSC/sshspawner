@@ -13,60 +13,29 @@ from jupyterhub.utils import maybe_future
 class SSHSpawner(Spawner):
 
     remote_hosts = List(Unicode(),
-        help=dedent("""Remote hosts available for spawning notebook servers.
+            help=dedent("""
+            Remote hosts available for spawning notebook servers.
 
-        This is a list of remote hosts where notebook servers can be spawned.
-        The `choose_remote_host()` method will select one of these hosts at 
-        random, unless it is overridden by another algorithm that could say,
-        perform load balancing.
+            List of remote hosts where notebook servers can be spawned. By
+            default, the remote host used to spawn a notebook is selected at 
+            random from this list. The `remote_host_selector()` attribute can
+            be used to customize the selection algorithm, possibly attempting
+            to balance load across all the hosts.
 
-        If this contains a single remote host value, that host will always be
-        selected (unless `choose_remote_host()` does something odd like just
-        return some other value).  That would be appropriate if there is just
-        one remote host available, or, if the remote host is itself a load 
-        balancer or is doing round-robin DNS.  That is usually a better choice
-        than trying to handle load-balancing through this spawner."""),
-        config=True)
-
-    remote_host = Unicode("",
-        help=dedent("""Remote host selected for spawning notebook servers.
-        
-        This is selected by the `choose_remote_host()` method.  See also
-        `remote_hosts` documentation."""))
-
-    @observe('remote_host')
-    def _observe_remote_host(self, change):
-        self.log.debug(f"remote_host: {self.remote_host}")
+            If this list contains a single remote host, that host will always
+            be selected (unless `remote_host_selector()` does something weird
+            like just return some other value). That would be appropriate if
+            there is just one remote host available, or, if the remote host is
+            itself a load balancer or is doing round-robin DNS.
+            """),
+            config=True)
 
     remote_host_selector = Any(
-        help="""Choose remote host somehow.""",
-        config=True)
+            help=dedent("""
+            Algorithm for selecting a `remote_host` for spawning a server.
 
-    remote_ip = Unicode("",
-        help=dedent("""Remote host IP of spawned notebook server.
-
-        Because the selected remote host may be a load-balancer the spawned
-        notebook may have a different IP from that of `remote_host`.  This 
-        value is returned from the spawned server usually."""))
-
-    @observe('remote_ip')
-    def _observe_remote_ip(self, change):
-        self.log.debug(f"remote_ip: {self.remote_ip}")
-
-    # TODO 
-    pid = Integer(0,
-        help=dedent("""Process ID of server spawned for the user."""))
-
-    remote_user = Unicode("",
-        config=True)
-
-    @default("remote_user")
-    def _default_remote_user(self):
-        return self.user.name
-
-    # TODO We should probably call everything with config'ed full absolute path
-    path = Unicode("/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin",
-            help="Default PATH (should include jupyter and python)",
+            This can be a coutine.
+            """),
             config=True)
 
     # The get_port.py script is in scripts/get_port.py
@@ -79,23 +48,18 @@ class SSHSpawner(Spawner):
             help="Command to return unused port on remote host",
             config=True)
 
-    # FIXME Fix help, what happens when not set?
-    hub_api_url = Unicode("",
-            help=dedent("""If set, Spawner will configure the containers to use
-            the specified URL to connect the hub api. This is useful when the
-            hub_api is bound to listen on all ports or is running inside of a
-            container."""),
+    ssh_keyfile = Unicode("~/.ssh/id_rsa",
+            help=dedent("""
+            DEPRECATED: Use `private_key` and `certificate`.
+            
+            Key file used to authenticate hub with remote host.
+
+            `~` will be expanded to the user's home directory and `{username}`
+            will be expanded to the user's username
+            """),
             config=True)
 
-    ssh_keyfile = Unicode("~/.ssh/id_rsa",
-        help=dedent("""DEPRECATED: Use `private_key` and `certificate`.
-        
-        Key file used to authenticate hub with remote host.
-
-        `~` will be expanded to the user's home directory and `{username}`
-        will be expanded to the user's username"""),
-        config=True)
-
+    # FIXME document
     private_key_path = Unicode("~/.ssh/id_rsa",
         config=True)
 
@@ -103,6 +67,7 @@ class SSHSpawner(Spawner):
     def _private_key_path(self, proposal):
         return proposal["value"].format(username=self.user.name)
 
+    # FIXME document
     certificate_path = Unicode("~/.ssh/id_rsa-cert.pub",
         config=True)
 
@@ -113,6 +78,47 @@ class SSHSpawner(Spawner):
     ssh_port = Integer(22,
             help="Port for ssh connections on remote side.",
             config=True)
+
+    # FIXME Fix help, what happens when not set?
+    hub_api_url = Unicode("",
+            help=dedent("""If set, Spawner will configure the containers to use
+            the specified URL to connect the hub api. This is useful when the
+            hub_api is bound to listen on all ports or is running inside of a
+            container."""),
+            config=True)
+
+    # TODO We should probably call everything with config'ed full absolute path
+    path = Unicode("/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin",
+            help="Default PATH (should include python, conda, etc.).",
+            config=True)
+
+    remote_host = Unicode("",
+            help=dedent("""
+            Remote host selected for spawning a notebook server.
+
+            This should be one of the entries in the `remote_hosts` list. To
+            customize how this value is set, see `remote_host_selector()`.
+            """))
+
+    remote_ip = Unicode("",
+            help=dedent("""
+            Remote host IP of spawned notebook server.
+
+            Because the selected `remote_host` itself may be a load-balancer,
+            the spawned notebook server may have a different IP from that of
+            `remote_host`. This value is returned from the spawned server.
+            """))
+
+    pid = Integer(0,
+            help="Process ID of server spawned for the user.")
+
+    # RT: Motion to deprecate, consider keys and certs.
+    remote_user = Unicode("",
+            config=True)
+
+    @default("remote_user")
+    def _default_remote_user(self):
+        return self.user.name
 
     def load_state(self, state):
         """Restore state about ssh-spawned server after a hub restart.
@@ -183,6 +189,27 @@ class SSHSpawner(Spawner):
             remote_host = random.choice(self.remote_hosts)
         return remote_host
 
+    async def remote_random_port(self):
+        """Select unoccupied port on the remote host and return it. 
+        
+        If this fails for some reason returns `(None, None)`."""
+
+        result = await self.remote_execute(self.remote_host,
+                self.remote_port_command)
+
+        if result.stdout != b"":
+            ip, port = result.stdout.split()
+            port = int(port)
+        else:
+            ip, port = None, None
+        self.log.debug(f"ip={ip} port={port}")
+        return (ip, port)
+
+    def get_env(self):
+        env = super().get_env()
+        env["PATH"] = self.path
+        return env
+
     async def poll(self):
         """Poll ssh-spawned process to see if it is still running.
 
@@ -209,28 +236,7 @@ class SSHSpawner(Spawner):
         alive = await self.remote_signal(15)
         self.clear_state()
 
-    async def remote_random_port(self):
-        """Select unoccupied port on the remote host and return it. 
-        
-        If this fails for some reason returns `(None, None)`."""
-
-        result = await self.remote_execute(self.remote_host,
-                self.remote_port_command)
-
-        if result.stdout != b"":
-            ip, port = result.stdout.split()
-            port = int(port)
-        else:
-            ip, port = None, None
-        self.log.debug(f"ip={ip} port={port}")
-        return (ip, port)
-
-    def get_env(self):
-        env = super().get_env()
-        env["PATH"] = self.path
-        return env
-
-    # FIXME add docstring
+    # FIXME Chop up a bit
     async def exec_notebook(self, command):
         """TBD"""
 
