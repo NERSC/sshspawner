@@ -1,5 +1,6 @@
 import asyncio, asyncssh
 import os
+import signal
 from textwrap import dedent
 import warnings
 import random
@@ -210,32 +211,6 @@ class SSHSpawner(Spawner):
         env["PATH"] = self.path
         return env
 
-    async def poll(self):
-        """Poll ssh-spawned process to see if it is still running.
-
-        If it is still running return None. If it is not running return exit
-        code of the process if we have access to it, or 0 otherwise."""
-
-        if not self.pid:
-                # no pid, not running
-            self.clear_state()
-            return 0
-
-        # send signal 0 to check if PID exists
-        alive = await self.remote_signal(0)
-        self.log.debug("Polling returned {}".format(alive))
-
-        if not alive:
-            self.clear_state()
-            return 0
-        else:
-            return None
-
-    async def stop(self, now=False):
-        """Stop single-user server process for the current user."""
-        alive = await self.remote_signal(15)
-        self.clear_state()
-
     # FIXME Chop up a bit
     async def exec_notebook(self, command):
         """TBD"""
@@ -268,6 +243,68 @@ class SSHSpawner(Spawner):
             return -1
 
         return pid
+
+    async def poll(self):
+        """Poll ssh-spawned process to see if it is still running.
+
+        If it is still running return None. If it is not running return exit
+        code of the process if we have access to it, or 0 otherwise."""
+
+        # If no PID we are not running.
+        if not self.pid:
+            self.clear_state()
+            return 0
+
+        # Send signal 0 to check if PID exists.
+        alive = await self.remote_signal(0)
+        if not alive:
+            self.clear_state()
+            return 0
+        else:
+            return None
+
+#   async def stop(self, now=False):
+#       """Stop single-user server process for the current user."""
+#       alive = await self.remote_signal(15)
+#       self.clear_state()
+
+    async def stop(self, now=False):
+        """Stop the single-user server process for the current user.
+
+        If `now` is False (default), shutdown the server as gracefully as 
+        possible, e.g. starting with SIGINT, then SIGTERM, then SIGKILL.  If
+        `now` is True, terminate the server immediately.  The coroutine should
+        return when the process is no longer running.
+        """
+
+        if not now:
+            status = await self.poll()
+            if status is not None:
+                return
+            self.log.debug(f"Interrupting {self.pid}")
+            await self.remote_signal(2)
+            await self.wait_for_death(10)
+
+        # clean shutdown failed, use TERM
+        status = await self.poll()
+        if status is not None:
+            return
+        self.log.debug(f"Terminating {self.pid}")
+        await self.remote_signal(15)
+        await self.wait_for_death(5)
+
+        # TERM failed, use KILL
+        status = await self.poll()
+        if status is not None:
+            return
+        self.log.debug(f"Killing {self.pid}")
+        await self.remote_signal(9)
+        await self.wait_for_death(5)
+
+        status = await self.poll()
+        if status is None:
+            # it all failed, zombie process
+            self.log.warning(f"Process {self.pid} never died")
 
     async def remote_signal(self, signal):
         """Signal on the remote host."""
