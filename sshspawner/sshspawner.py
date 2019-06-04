@@ -7,6 +7,7 @@ import random
 from traitlets import Any, Bool, Unicode, Integer, List, default, observe, validate
 
 from jupyterhub.spawner import Spawner
+from jupyterhub.utils import maybe_future
 
 
 class SSHSpawner(Spawner):
@@ -144,7 +145,7 @@ class SSHSpawner(Spawner):
     async def start(self):
         """Start single-user server on remote host."""
 
-        self.remote_host = self.select_remote_host()
+        self.remote_host = await self.select_remote_host()
         
         self.remote_ip, port = await self.remote_random_port()
         if self.remote_ip is None or port is None or port == 0:
@@ -175,10 +176,10 @@ class SSHSpawner(Spawner):
 
         return (self.remote_ip, port)
 
-    def select_remote_host(self):
+    async def select_remote_host(self):
         """TBD"""
         if self.remote_host_selector:
-            remote_host = self.remote_host_selector(self)
+            remote_host = await maybe_future(self.remote_host_selector(self))
         else:
             remote_host = random.choice(self.remote_hosts)
         return remote_host
