@@ -37,7 +37,7 @@ class SSHSpawner(Spawner):
     def _observe_remote_host(self, change):
         self.log.debug(f"remote_host: {self.remote_host}")
 
-    choose_remote_host = Any(
+    remote_host_selector = Any(
         help="""Choose remote host somehow.""",
         config=True)
 
@@ -144,10 +144,7 @@ class SSHSpawner(Spawner):
     async def start(self):
         """Start single-user server on remote host."""
 
-        if self.choose_remote_host:
-            self.remote_host = self.choose_remote_host(self)
-        else:
-            self.remote_host = random.choice(self.remote_hosts)
+        self.remote_host = self.select_remote_host()
         
         self.remote_ip, port = await self.remote_random_port()
         if self.remote_ip is None or port is None or port == 0:
@@ -177,6 +174,14 @@ class SSHSpawner(Spawner):
             return None
 
         return (self.remote_ip, port)
+
+    def select_remote_host(self):
+        """TBD"""
+        if self.remote_host_selector:
+            remote_host = self.remote_host_selector(self)
+        else:
+            remote_host = random.choice(self.remote_hosts)
+        return remote_host
 
     async def poll(self):
         """Poll ssh-spawned process to see if it is still running.
