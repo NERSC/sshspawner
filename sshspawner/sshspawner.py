@@ -4,10 +4,9 @@ from textwrap import dedent
 import warnings
 import random
 
-from traitlets import Bool, Unicode, Integer, List, default, observe, validate
+from traitlets import Any, Bool, Unicode, Integer, List, default, observe, validate
 
 from jupyterhub.spawner import Spawner
-from jupyterhub.traitlets import Callable
 
 
 class SSHSpawner(Spawner):
@@ -38,15 +37,9 @@ class SSHSpawner(Spawner):
     def _observe_remote_host(self, change):
         self.log.debug(f"remote_host: {self.remote_host}")
 
-    choose_remote_host = Callable(
+    choose_remote_host = Any(
         help="""Choose remote host somehow.""",
         config=True)
-
-    @default("choose_remote_host")
-    def _default_choose_remote_host(self):
-        def func():
-            return random.choice(self.remote_hosts)
-        return func
 
     # TODO Check for removal, there's already `ip`.
     remote_ip = Unicode("",
@@ -151,7 +144,10 @@ class SSHSpawner(Spawner):
     async def start(self):
         """Start single-user server on remote host."""
 
-        self.remote_host = self.choose_remote_host()
+        if self.choose_remote_host:
+            self.remote_host = self.choose_remote_host(self)
+        else:
+            self.remote_host = random.choice(self.remote_hosts)
         
         self.remote_ip, port = await self.remote_random_port()
         if self.remote_ip is None or port is None or port == 0:
