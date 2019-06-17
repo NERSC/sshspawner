@@ -60,17 +60,32 @@ class SSHSpawner(Spawner):
             """),
             config=True)
 
-    # FIXME document
     private_key_path = Unicode("~/.ssh/id_rsa",
-        config=True)
+            help=dedent("""
+            Private key path.
+
+            `~` is expanded to the user's home directory by shell expansion and
+            `{username}` is expanded to be the user's username.
+            """),
+            config=True)
 
     @validate('private_key_path')
     def _private_key_path(self, proposal):
         return proposal["value"].format(username=self.user.name)
 
-    # FIXME document
-    certificate_path = Unicode("~/.ssh/id_rsa-cert.pub",
-        config=True)
+    certificate_path = Unicode("",
+            help=dedent("""
+            Certificate path (optional).
+
+            This may be used along with the private key. If no certificate is
+            specified, an attempt is made by default to load a corresponding
+            certificate or certificate chain from a file constructed by
+            appending `-cert.pub` to the end of the key path.
+
+            `~` is expanded to the user's home directory by shell expansion
+            and `{username}` is expanded to be the user's username.
+            """),
+            config=True)
 
     @validate('certificate_path')
     def _certificate_path(self, proposal):
@@ -308,11 +323,8 @@ class SSHSpawner(Spawner):
         return result.exit_status == 0
 
     async def remote_execute(self, host_or_ip, command, stdin=None):
-        private_key = asyncssh.read_private_key(self.private_key_path)
-        certificate = asyncssh.read_certificate(self.certificate_path)
-        client_keys = [(private_key, certificate)]
         async with asyncssh.connect(host_or_ip, self.ssh_port,
-                username=self.remote_user, client_keys=client_keys,
+                username=self.remote_user, client_keys=self.client_keys(),
                 known_hosts=None) as connection:
             if stdin is None:
                 result = await connection.run(command)
@@ -322,3 +334,11 @@ class SSHSpawner(Spawner):
                 self.log.debug(f"{command} {stdin}: {result.exit_status}")
             # should do some error reporting if any error
             return result
+
+    def client_keys(self):
+        private_key = asyncssh.read_private_key(self.private_key_path)
+        if self.certificate_path:
+            certificate = asyncssh.read_certificate(self.certificate_path)
+            return [(private_key, certificate)]
+        else:
+            return private_key
