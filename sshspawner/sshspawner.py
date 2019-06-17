@@ -316,8 +316,9 @@ class SSHSpawner(Spawner):
                 known_hosts=None) as connection:
             if stdin is None:
                 result = await connection.run(command)
+                self.log.debug(f"{command}: {result.exit_status}")
             else:
                 result = await connection.run(command, stdin=stdin)
-            self.log.debug(f"{command}: {result.exit_status}")
+                self.log.debug(f"{command} {stdin}: {result.exit_status}")
             # should do some error reporting if any error
             return result
