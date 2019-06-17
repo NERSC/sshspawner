@@ -263,11 +263,6 @@ class SSHSpawner(Spawner):
         else:
             return None
 
-#   async def stop(self, now=False):
-#       """Stop single-user server process for the current user."""
-#       alive = await self.remote_signal(15)
-#       self.clear_state()
-
     async def stop(self, now=False):
         """Stop the single-user server process for the current user.
 
@@ -277,14 +272,13 @@ class SSHSpawner(Spawner):
         return when the process is no longer running.
         """
 
-#       # https://github.com/jupyterhub/jupyterhub/issues/1419, is labhub eating the SIGINT
-#       if not now:
-#           status = await self.poll()
-#           if status is not None:
-#               return
-#           self.log.debug(f"Interrupting {self.pid}")
-#           await self.remote_signal(2)
-#           await self.wait_for_death(10)
+        if not now:
+            status = await self.poll()
+            if status is not None:
+                return
+            self.log.debug(f"Interrupting {self.pid}")
+            await self.remote_signal(2)
+            await self.wait_for_death(10) # FIXME configurable
 
         # clean shutdown failed, use TERM
         status = await self.poll()
@@ -292,7 +286,7 @@ class SSHSpawner(Spawner):
             return
         self.log.debug(f"Terminating {self.pid}")
         await self.remote_signal(15)
-        await self.wait_for_death(10)
+        await self.wait_for_death(10) # FIXME configurable
 
         # TERM failed, use KILL
         status = await self.poll()
@@ -300,7 +294,7 @@ class SSHSpawner(Spawner):
             return
         self.log.debug(f"Killing {self.pid}")
         await self.remote_signal(9)
-        await self.wait_for_death(10)
+        await self.wait_for_death(10) # FIXME configurable
 
         status = await self.poll()
         if status is None:
