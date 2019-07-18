@@ -186,9 +186,23 @@ class SSHSpawner(Spawner):
             if value[0:6] == '--port':
                 cmd[index] = '--port=%d' % (port)
 
-        remote_cmd = ' '.join(cmd)
+        script = self.format_script(" ".join(cmd))
 
-        self.pid = await self.exec_notebook(remote_cmd)
+        script_path = self.script_path.format(username=self.user.name)
+
+        with open(script_path, "w") as f:
+            f.write(script)
+
+        with open(script_path, "r") as f:
+            self.log.debug(f"{script_path} written as:\n" + f.read())
+
+        result = await self.remote_execute(self.remote_ip, "bash -s",
+                script_path)
+
+        if result.stdout != b'':
+            self.pid = int(result.stdout)
+        else:
+            self.pid = -1
 
         self.log.debug("Starting User: {}, PID: {}".format(self.user.name, self.pid))
 
@@ -226,38 +240,45 @@ class SSHSpawner(Spawner):
         env["PATH"] = self.path
         return env
 
-    # FIXME Chop up a bit
-    async def exec_notebook(self, command):
-        """TBD"""
+    #
 
-        bash_script_str = "#!/bin/bash\n"
+    def format_script(self, command):
+        args = script_args(command)
+        return self.script.format(**args)
+
+    def script_args(self, command):
+        args = dict()
+
+        args["formatted_env"] = ""
         for item in self.get_env().items():
-            bash_script_str += 'export %s=%s\n' % item
+            args["formatted_env"] += "export {}={}\n".format(item)
+        
+        args.update(self.script_vars)
+        args["command"] = command
+        return args
 
-        bash_script_str += 'unset XDG_RUNTIME_DIR\n'
-        bash_script_str += 'touch .jupyter.log\n'
-        bash_script_str += 'chmod 600 .jupyter.log\n'
-        bash_script_str += '%s < /dev/null >> .jupyter.log 2>&1 & pid=$!\n' % command
-        bash_script_str += 'echo $pid\n'
+    script_path = Unicode("/tmp/{username}_run.sh",
+            help=dedent("""
+            Path where shell script is written on the hub.
 
-        run_script = "/tmp/{}_run.sh".format(self.user.name)
-        with open(run_script, "w") as f:
-            f.write(bash_script_str)
-        if not os.path.isfile(run_script):
-            raise Exception("The file " + run_script + "was not created.")
-        else:
-            with open(run_script, "r") as f:
-                self.log.debug(run_script + " was written as:\n" + f.read())
+            `~` is expanded to the user's home directory by shell expansion and
+            `{username}` is expanded to be the user's username.
+            """),
+            config=True)
 
-        result = await self.remote_execute(self.remote_ip, "bash -s",
-                run_script)
+    script = Unicode(dedent("""
+            #!/bin/bash
+            {formatted_env}
+            unset XDG_RUNTIME_DIR
+            touch {singleuser_logfile}
+            chmod 600 {singleuser_logfile}
+            {command} < /dev/null >> {singleuser_logfile} 2>&1 & pid=$!
+            echo $pid
+            """),
+            config=True)
 
-        if result.stdout != b'':
-            pid = int(result.stdout)
-        else:
-            return -1
-
-        return pid
+    script_vars = Dict({"singleuser_logfile": ".jupyter.log"},
+            config=True)
 
     async def poll(self):
         """Poll ssh-spawned process to see if it is still running.
