@@ -251,7 +251,7 @@ class SSHSpawner(Spawner):
 
         args["formatted_env"] = ""
         for item in self.get_env().items():
-            args["formatted_env"] += "export {}={}\n".format(item)
+            args["formatted_env"] += "export {}={}\n".format(*item)
         
         args.update(self.script_vars)
         args["command"] = command
