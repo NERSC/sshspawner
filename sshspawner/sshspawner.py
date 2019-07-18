@@ -5,7 +5,7 @@ from textwrap import dedent
 import warnings
 import random
 
-from traitlets import Any, Bool, Unicode, Integer, List, default, observe, validate
+from traitlets import Any, Bool, Dict, Unicode, Integer, List, default, observe, validate
 
 from jupyterhub.spawner import Spawner
 from jupyterhub.utils import maybe_future
