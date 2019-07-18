@@ -308,12 +308,14 @@ class SSHSpawner(Spawner):
         return when the process is no longer running.
         """
 
+        self.death_interval = 2.0
+
         if not now:
             status = await self.poll()
             if status is not None:
                 return
             self.log.debug(f"Interrupting {self.pid}")
-            await self.remote_signal(2)
+            await self.remote_signal(signal.SIGINT)
             await self.wait_for_death(10) # FIXME configurable
 
         # clean shutdown failed, use TERM
@@ -321,7 +323,7 @@ class SSHSpawner(Spawner):
         if status is not None:
             return
         self.log.debug(f"Terminating {self.pid}")
-        await self.remote_signal(15)
+        await self.remote_signal(signal.SIGTERM)
         await self.wait_for_death(10) # FIXME configurable
 
         # TERM failed, use KILL
@@ -329,7 +331,7 @@ class SSHSpawner(Spawner):
         if status is not None:
             return
         self.log.debug(f"Killing {self.pid}")
-        await self.remote_signal(9)
+        await self.remote_signal(signal.SIGKILL)
         await self.wait_for_death(10) # FIXME configurable
 
         status = await self.poll()
