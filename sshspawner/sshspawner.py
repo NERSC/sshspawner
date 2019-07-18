@@ -243,7 +243,7 @@ class SSHSpawner(Spawner):
     #
 
     def format_script(self, command):
-        args = script_args(command)
+        args = self.script_args(command)
         return self.script.format(**args)
 
     def script_args(self, command):
