@@ -8,7 +8,6 @@ import shutil
 from tempfile import TemporaryDirectory
 
 from traitlets import Bool, Unicode, Integer, List, observe, default
-from jupyterhub.utils import make_ssl_context, wait_for_http_server
 from jupyterhub.spawner import Spawner
 
 
@@ -175,49 +174,15 @@ class SSHSpawner(Spawner):
             self.clear_state()
             return 0
 
-        # set up ssl context and check
-        url = "https://{ip}:{port}".format(
-                        ip=(self.remote_ip or '127.0.0.1'),
-                        port=self.remote_port
-                  )
-        key = self.user.settings.get('internal_ssl_key')
-        cert = self.user.settings.get('internal_ssl_cert')
-        ca = self.user.settings.get('internal_ssl_ca')
-        ctx = make_ssl_context(key, cert, cafile=ca)
-        try:
-            reachable = await wait_for_http_server(url, ssl_context=ctx)
-        except Exception as e:
-            if isinstance(e, TimeoutError):
-                e.reason = 'timeout'
-                self.log.warning(
-                    "Unable to reach {user}'s server for 10 seconds. "
-                    "Giving up: {err}".format(
-                        user=self.user.name,
-                        err=e
-                    ),
-                )
-                return 1
-            else:
-                e.reason = 'error'
-                self.log.warning(
-                    "Error reaching {user}'s server: {err}".format(
-                        user=self.user.name,
-                        err=e
-                    )
-                )
-                return 2
-        else:
-            return None if reachable else 0
-
         # send signal 0 to check if PID exists
-        # alive = await self.remote_signal(0)
-        # self.log.debug("Polling returned {}".format(alive))
+        alive = await self.remote_signal(0)
+        self.log.debug("Polling returned {}".format(alive))
 
-        # if not alive:
-        #     self.clear_state()
-        #     return 0
-        # else:
-        #     return None
+        if not alive:
+            self.clear_state()
+            return 0
+        else:
+            return None
 
     async def stop(self, now=False):
         """Stop single-user server process for the current user."""
