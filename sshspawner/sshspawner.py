@@ -124,23 +124,24 @@ class SSHSpawner(Spawner):
         cmd.extend(self.cmd)
         cmd.extend(self.get_args())
 
-        with TemporaryDirectory() as td:
-            local_resource_path = td
+        if self.user.settings["internal_ssl"]:
+            with TemporaryDirectory() as td:
+                local_resource_path = td
 
-            self.cert_paths = self.stage_certs(
-                    self.cert_paths,
-                    local_resource_path
-                )
+                self.cert_paths = self.stage_certs(
+                        self.cert_paths,
+                        local_resource_path
+                    )
 
-            # create resource path dir in user's home on remote
-            async with asyncssh.connect(self.remote_ip, username=username,client_keys=[(k,c)],known_hosts=None) as conn:
-                mkdir_cmd = "mkdir -p {path} 2>/dev/null".format(path=self.resource_path)
-                result = await conn.run(mkdir_cmd)
+                # create resource path dir in user's home on remote
+                async with asyncssh.connect(self.remote_ip, username=username,client_keys=[(k,c)],known_hosts=None) as conn:
+                    mkdir_cmd = "mkdir -p {path} 2>/dev/null".format(path=self.resource_path)
+                    result = await conn.run(mkdir_cmd)
 
-            # copy files
-            files = [os.path.join(local_resource_path, f) for f in os.listdir(local_resource_path)]
-            async with asyncssh.connect(self.remote_ip, username=username,client_keys=[(k,c)],known_hosts=None) as conn:
-                await asyncssh.scp(files, (conn, self.resource_path))
+                # copy files
+                files = [os.path.join(local_resource_path, f) for f in os.listdir(local_resource_path)]
+                async with asyncssh.connect(self.remote_ip, username=username,client_keys=[(k,c)],known_hosts=None) as conn:
+                    await asyncssh.scp(files, (conn, self.resource_path))
 
         if self.hub_api_url != "":
             old = "--hub-api-url={}".format(self.hub.api_url)
