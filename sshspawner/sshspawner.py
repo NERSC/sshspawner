@@ -3,9 +3,11 @@ import os
 from textwrap import dedent
 import warnings
 import random
+import pwd
+import shutil
+from tempfile import TemporaryDirectory
 
-from traitlets import Bool, Unicode, Integer, List, observe
-
+from traitlets import Bool, Unicode, Integer, List, observe, default
 from jupyterhub.spawner import Spawner
 
 
@@ -69,6 +71,12 @@ class SSHSpawner(Spawner):
             help=dedent("""Process ID of single-user server process spawned for
             current user."""))
 
+    resource_path = Unicode(".jupyterhub-resources",
+            help=dedent("""The base path where all necessary resources are
+            placed. Generally left relative so that resources are placed into
+            this base directory in the user's home directory."""),
+            config=True)
+
     def load_state(self, state):
         """Restore state about ssh-spawned server after a hub restart.
 
@@ -99,15 +107,41 @@ class SSHSpawner(Spawner):
     async def start(self):
         """Start single-user server on remote host."""
 
+        username = self.user.name
+        kf = self.ssh_keyfile.format(username=username)
+        cf = kf + "-cert.pub"
+        k = asyncssh.read_private_key(kf)
+        c = asyncssh.read_certificate(cf)
+
         self.remote_host = self.choose_remote_host()
         
         self.remote_ip, port = await self.remote_random_port()
         if self.remote_ip is None or port is None or port == 0:
             return False
+        self.remote_port = str(port)
         cmd = []
 
         cmd.extend(self.cmd)
         cmd.extend(self.get_args())
+
+        if self.user.settings["internal_ssl"]:
+            with TemporaryDirectory() as td:
+                local_resource_path = td
+
+                self.cert_paths = self.stage_certs(
+                        self.cert_paths,
+                        local_resource_path
+                    )
+
+                # create resource path dir in user's home on remote
+                async with asyncssh.connect(self.remote_ip, username=username,client_keys=[(k,c)],known_hosts=None) as conn:
+                    mkdir_cmd = "mkdir -p {path} 2>/dev/null".format(path=self.resource_path)
+                    result = await conn.run(mkdir_cmd)
+
+                # copy files
+                files = [os.path.join(local_resource_path, f) for f in os.listdir(local_resource_path)]
+                async with asyncssh.connect(self.remote_ip, username=username,client_keys=[(k,c)],known_hosts=None) as conn:
+                    await asyncssh.scp(files, (conn, self.resource_path))
 
         if self.hub_api_url != "":
             old = "--hub-api-url={}".format(self.hub.api_url)
@@ -271,3 +305,22 @@ class SSHSpawner(Spawner):
             retcode = result.exit_status
         self.log.debug("command: {} returned {} --- {} --- {}".format(command, stdout, stderr, retcode))
         return (retcode == 0)
+
+    def stage_certs(self, paths, dest):
+        shutil.move(paths['keyfile'], dest)
+        shutil.move(paths['certfile'], dest)
+        shutil.copy(paths['cafile'], dest)
+
+        key_base_name = os.path.basename(paths['keyfile'])
+        cert_base_name = os.path.basename(paths['certfile'])
+        ca_base_name = os.path.basename(paths['cafile'])
+
+        key = os.path.join(self.resource_path, key_base_name)
+        cert = os.path.join(self.resource_path, cert_base_name)
+        ca = os.path.join(self.resource_path, ca_base_name)
+
+        return {
+            "keyfile": key,
+            "certfile": cert,
+            "cafile": ca,
+        }
