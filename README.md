@@ -2,6 +2,7 @@
 # sshspawner
 
 The *sshspawner* enables JupyterHub to spawn single-user notebook servers on remote hosts over SSH.
+We provide this package as a reference implementation only, the authors offer no general user support.
 
 ## Features
 
@@ -39,13 +40,7 @@ All code is licensed under the terms of the revised BSD license.
 
 ## Resources
 
-### JupyterHub and sshspawner
-
-- [Reporting Issues](https://github.com/NERSC/sshspawner/issues)
 - [Documentation for JupyterHub](https://jupyterhub.readthedocs.io)
-
-### Jupyter
-
 - [Documentation for Project Jupyter](https://jupyter.readthedocs.io/en/latest/index.html) | [PDF](https://media.readthedocs.org/pdf/jupyter/latest/jupyter.pdf)
 - [Project Jupyter website](https://jupyter.org)
 
