@@ -30,10 +30,6 @@ Install [scripts/get_port.py](scripts/get_port.py) on remote host and set correc
 See [jupyterhub_config.py](jupyterhub_config.py) for a sample configuration.
 Adjust values for your installation.
 
-## Getting Help
-
-We encourage you to post issues on the GitHub issue tracker if you have questions.
-
 ## License
 
 All code is licensed under the terms of the revised BSD license.
