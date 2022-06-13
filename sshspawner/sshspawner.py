@@ -16,6 +16,9 @@ class SSHSpawner(Spawner):
     # http://traitlets.readthedocs.io/en/stable/migration.html#separation-of-metadata-and-keyword-arguments-in-traittype-contructors
     # config is an unrecognized keyword
 
+    # Change default ip value for SSHSpawners
+    ip = "0.0.0.0"
+
     remote_hosts = List(trait=Unicode(),
             help="Possible remote hosts from which to choose remote_host.",
             config=True)
@@ -114,7 +117,7 @@ class SSHSpawner(Spawner):
         c = asyncssh.read_certificate(cf)
 
         self.remote_host = self.choose_remote_host()
-        
+
         self.remote_ip, port = await self.remote_random_port()
         if self.remote_ip is None or port is None or port == 0:
             return False
@@ -149,9 +152,16 @@ class SSHSpawner(Spawner):
             for index, value in enumerate(cmd):
                 if value == old:
                     cmd[index] = new
+
+        has_port = False
         for index, value in enumerate(cmd):
             if value[0:6] == '--port':
                 cmd[index] = '--port=%d' % (port)
+                has_port = True
+
+        # Always supply port option!
+        if not has_port:
+            cmd.append(f"--port={port}")
 
         remote_cmd = ' '.join(cmd)
 
@@ -211,8 +221,8 @@ class SSHSpawner(Spawner):
 
     # FIXME this needs to now return IP and port too
     async def remote_random_port(self):
-        """Select unoccupied port on the remote host and return it. 
-        
+        """Select unoccupied port on the remote host and return it.
+
         If this fails for some reason return `None`."""
 
         username = self.get_remote_user(self.user.name)
@@ -257,7 +267,7 @@ class SSHSpawner(Spawner):
         for item in env.items():
             # item is a (key, value) tuple
             # command = ('export %s=%s;' % item) + command
-            bash_script_str += 'export %s=%s\n' % item
+            bash_script_str += "export %s='%s'\n" % item
         bash_script_str += 'unset XDG_RUNTIME_DIR\n'
 
         bash_script_str += 'touch .jupyter.log\n'
